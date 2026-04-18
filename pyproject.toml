@@ -40,6 +40,9 @@ dev = [
     "mypy>=1.0.0",
 ]
 
+[project.scripts]
+financial-sdk = "financial_sdk_cli:main"
+
 [project.urls]
 Homepage = "https://github.com/example/financial-sdk"
 

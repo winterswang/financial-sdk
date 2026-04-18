@@ -24,6 +24,33 @@
 pip install -e .
 ```
 
+## CLI 命令行工具
+
+安装后可用 `financial-sdk` 命令：
+
+```bash
+# 获取财务数据
+financial-sdk get 9992.HK income_statement annual
+financial-sdk get 0700.HK all quarterly --force-refresh
+financial-sdk get AAPL balance_sheet annual --format json
+
+# 健康检查
+financial-sdk health
+
+# 获取支持的股票
+financial-sdk stocks --market HK
+
+# 缓存统计
+financial-sdk cache
+```
+
+### CLI 帮助
+
+```bash
+financial-sdk --help          # 查看所有命令
+financial-sdk get --help      # 查看 get 命令帮助
+```
+
 ## 快速开始
 
 ```python
@@ -144,6 +171,7 @@ financial-sdk/
 │       ├── ashare_adapter.py   # A股适配器
 │       ├── hk_adapter.py       # 港股适配器
 │       └── us_adapter.py       # 美股适配器
+├── src/financial_sdk_cli.py         # CLI 命令行工具
 ├── src/financial_sdk_mcp_server.py  # MCP Server 入口
 ├── tests/                      # 测试文件
 ├── config/                     # 配置文件
