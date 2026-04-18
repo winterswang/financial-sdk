@@ -155,7 +155,15 @@ def _transpose_for_display(df: pd.DataFrame, standard_only: bool = False) -> pd.
             rows_to_drop.append(idx)
             continue
         # 跳过全为 NaN/- 的行
-        if df.loc[idx].isna().all() or (df.loc[idx] == "-").all():
+        # 注意：df.loc[idx] 可能因为重复索引返回 DataFrame，需处理
+        try:
+            row = df.loc[idx]
+            if isinstance(row, pd.DataFrame):
+                row = row.iloc[0]
+            if row.isna().all() or (row == "-").all():
+                rows_to_drop.append(idx)
+        except Exception:
+            # 如果取值失败，跳过该行
             rows_to_drop.append(idx)
 
     df = df.drop(index=rows_to_drop, errors="ignore")

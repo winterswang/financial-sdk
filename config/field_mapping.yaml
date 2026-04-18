@@ -183,11 +183,28 @@ indicators:
   # 必需字段
   REPORT_DATE: "report_date"
   SECURITY_CODE: "stock_code"
+
+  # stock_financial_abstract 返回的中文指标名映射
+  净资产收益率(ROE): "roe"
+  总资产报酬率(ROA): "roa"
+  毛利率: "gross_margin"
+  净利率: "net_margin"
+  基本每股收益: "eps"
+  稀释每股收益: "diluted_eps"
+  每股净资产: "bvps"
+  资产负债率: "debt_to_assets"
+  净资产收益率: "roe"
+  总资产报酬率: "roa"
+  销售净利率: "net_margin"
+  期间费用率: "expense_ratio"
+
+  # AkShare 英文指标名映射
   ROE_AVG: "roe"
   ROA: "roa"
   GROSS_PROFIT_RATIO: "gross_margin"
   NET_PROFIT_RATIO: "net_margin"
   BASIC_EPS: "eps"
+  DILUTED_EPS: "diluted_eps"
 
   # 比率类
   CURRENT_RATIO: "current_ratio"

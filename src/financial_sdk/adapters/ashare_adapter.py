@@ -44,8 +44,11 @@ class ASHareAdapter(BaseAdapter):
         """加载字段映射配置"""
         if config_path is None:
             # 使用默认配置
+            # 项目结构: financial-sdk/src/financial_sdk/adapters/ashare_adapter.py
+            #           financial-sdk/config/field_mapping.yaml
+            # 需要向上4级到达项目根目录
             config_path = (
-                Path(__file__).parent.parent.parent / "config" / "field_mapping.yaml"
+                Path(__file__).parent.parent.parent.parent / "config" / "field_mapping.yaml"
             )
         else:
             config_path = Path(config_path)
@@ -376,11 +379,19 @@ class ASHareAdapter(BaseAdapter):
         akshare = self._get_akshare()
 
         try:
-            # AkShare的财务指标接口
-            df = akshare.stock_financial_analysis_indicator(
-                symbol=self._extract_stock_code(stock_code)
+            # 使用 stock_financial_abstract 接口获取财务指标
+            df = akshare.stock_financial_abstract(
+                symbol=self._extract_stock_code(stock_code).replace("SH", "").replace("SZ", "")
             )
             self._validate_not_empty(df, stock_code, "indicators")
+
+            # 转换数据格式：从长格式转为宽格式
+            # stock_financial_abstract 返回的格式是：
+            # 选项 | 指标 | 20251231 | 20250930 | ...
+            # 需要转换为：
+            # REPORT_DATE | SECURITY_CODE | 指标1 | 指标2 | ...
+
+            df = self._pivot_indicators(df)
             df = self._map_fields(df, "indicators")
             df = self._standardize_date_column(df, "report_date")
             return df
@@ -393,6 +404,39 @@ class ASHareAdapter(BaseAdapter):
                 reason=str(e),
                 adapter_name=self.adapter_name,
             )
+
+    def _pivot_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        将 stock_financial_abstract 返回的长格式数据透视为宽格式
+
+        Args:
+            df: 原始 DataFrame
+
+        Returns:
+            pd.DataFrame: 透视后的宽格式 DataFrame
+        """
+        if df is None or df.empty:
+            return df
+
+        # 列名：选项、指标、然后是日期列
+        date_columns = [c for c in df.columns if c not in ["选项", "指标"]]
+
+        # 获取所有指标名称
+        indicator_names = df["指标"].tolist()
+
+        # 为每个日期创建一个行
+        rows = []
+        for date_col in date_columns:
+            row_data = {"report_date": date_col}
+            for idx, row in df.iterrows():
+                indicator_name = row["指标"]
+                value = row[date_col]
+                row_data[indicator_name] = value
+            rows.append(row_data)
+
+        result_df = pd.DataFrame(rows)
+
+        return result_df
 
     def is_available(self) -> bool:
         """检查akshare是否可用"""
