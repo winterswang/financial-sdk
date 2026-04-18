@@ -1,0 +1,32 @@
+# FinancialSDK 默认配置
+
+cache:
+  enabled: true
+  max_size: 1000
+  ttl_static: 86400    # 24小时 (秒)
+  ttl_dynamic: 3600   # 1小时 (秒)
+
+adapter:
+  ashare:
+    enabled: true
+    priority: 1
+    timeout: 30
+
+  hk:
+    enabled: true
+    priority: 1
+    timeout: 30
+
+  us:
+    enabled: true
+    priority: 1
+    timeout: 30
+    use_easymoney_fallback: true
+
+monitor:
+  enabled: true
+  log_level: INFO
+
+performance:
+  max_retries: 3
+  retry_delay: 1

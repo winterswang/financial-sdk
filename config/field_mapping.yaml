@@ -1,0 +1,79 @@
+# A股字段映射配置
+# AkShare字段名 -> 标准字段名
+
+balance_sheet:
+  # 必需字段
+  "报告日期": "report_date"
+  "股票代码": "stock_code"
+  "流动资产合计": "current_assets"
+  "非流动资产合计": "non_current_assets"
+  "资产总计": "total_assets"
+  "流动负债合计": "current_liabilities"
+  "非流动负债合计": "non_current_liabilities"
+  "负债合计": "total_liabilities"
+  "所有者权益合计": "total_equity"
+
+  # 可选字段
+  "固定资产": "fixed_assets"
+  "无形资产": "intangible_assets"
+  "应收账款": "accounts_receivable"
+  "存货": "inventory"
+  "应付账款": "accounts_payable"
+  "短期借款": "short_term_debt"
+  "长期借款": "long_term_debt"
+
+income_statement:
+  # 必需字段
+  "报告日期": "report_date"
+  "股票代码": "stock_code"
+  "营业收入": "revenue"
+  "营业成本": "total_cost"
+  "毛利": "gross_profit"
+  "营业利润": "operating_profit"
+  "利润总额": "profit_before_tax"
+  "净利润": "net_profit"
+  "基本每股收益": "eps"
+
+  # 可选字段
+  "营业费用": "operating_cost"
+  "销售费用": "selling_expense"
+  "管理费用": "admin_expense"
+  "财务费用": "financial_expense"
+  "研发费用": "rd_expense"
+  "所得税费用": "tax_expense"
+
+cash_flow:
+  # 必需字段
+  "报告日期": "report_date"
+  "股票代码": "stock_code"
+  "经营活动现金净流量": "operating_cash_flow"
+  "投资活动现金净流量": "investing_cash_flow"
+  "筹资活动现金净流量": "financing_cash_flow"
+  "现金及现金等价物净增加额": "net_cash_flow"
+
+  # 可选字段
+  "期初现金及现金等价物": "beginning_cash"
+  "期末现金及现金等价物": "ending_cash"
+  "经营活动现金净流量/营业收入": "cfo_to_revenue"
+  "资本支出": "capex"
+
+indicators:
+  # 必需字段
+  "报告日期": "report_date"
+  "股票代码": "stock_code"
+  "净资产收益率(ROE)": "roe"
+  "总资产收益率(ROA)": "roa"
+  "毛利率": "gross_margin"
+  "净利率": "net_margin"
+  "每股收益": "eps"
+
+  # 可选字段
+  "流动比率": "current_ratio"
+  "速动比率": "quick_ratio"
+  "资产负债率": "debt_to_equity"
+  "资产周转率": "asset_turnover"
+  "存货周转率": "inventory_turnover"
+  "应收账款周转率": "receivables_turnover"
+  "每股净资产": "bvps"
+  "市盈率": "pe_ratio"
+  "市净率": "pb_ratio"
