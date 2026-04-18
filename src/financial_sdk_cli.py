@@ -15,10 +15,53 @@ import json
 import sys
 from pathlib import Path
 
+import pandas as pd
+
 # Add src to path for direct execution
 sys.path.insert(0, str(Path(__file__).parent))
 
 from financial_sdk import FinancialFacade
+
+
+def _filter_by_year(df: pd.DataFrame, year_spec: str) -> pd.DataFrame:
+    """
+    按年份筛选数据
+
+    Args:
+        df: DataFrame，需包含 report_date 列
+        year_spec: 年份规格，支持:
+            - "2024" (单个年份)
+            - "2023,2024" (多个年份)
+            - "2020-2024" (年份范围)
+
+    Returns:
+        筛选后的 DataFrame
+    """
+    if df is None or df.empty:
+        return df
+
+    if "report_date" not in df.columns:
+        return df
+
+    # 转换日期列
+    df = df.copy()
+    df["_year_col"] = pd.to_datetime(df["report_date"]).dt.year
+
+    # 解析年份规格
+    years = set()
+    for part in year_spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            start, end = part.split("-")
+            years.update(range(int(start), int(end) + 1))
+        else:
+            years.add(int(part))
+
+    # 筛选
+    df = df[df["_year_col"].isin(years)]
+    df = df.drop(columns=["_year_col"])
+
+    return df
 
 
 def cmd_get(args):
@@ -49,6 +92,13 @@ def cmd_get(args):
         for report_name in ["balance_sheet", "income_statement", "cash_flow", "indicators"]:
             df = getattr(bundle, report_name, None)
             if df is not None and not df.empty:
+                # 按年份筛选
+                if args.year:
+                    df = _filter_by_year(df, args.year)
+
+                if df.empty:
+                    continue
+
                 print(f"\n=== {report_name} ({len(df)} 行) ===")
                 if args.format == "table":
                     print(df.to_string(index=False))
@@ -97,6 +147,9 @@ def main():
         epilog="""
 示例:
   financial-sdk get 9992.HK income_statement annual
+  financial-sdk get 9992.HK income_statement annual --year 2024
+  financial-sdk get 9992.HK income_statement annual --year 2023,2024
+  financial-sdk get 9992.HK income_statement annual -y 2020-2024
   financial-sdk get 0700.HK all quarterly --force-refresh
   financial-sdk get AAPL balance_sheet annual --format json
   financial-sdk health
@@ -118,6 +171,8 @@ def main():
                            help="报告期类型 (默认: annual)")
     get_parser.add_argument("--force-refresh", action="store_true",
                            help="强制刷新缓存")
+    get_parser.add_argument("--year", "-y",
+                           help="指定年份筛选，支持: 2024 或 2023,2024 或 2020-2024")
     get_parser.add_argument("--format", default="table",
                            choices=["table", "json"],
                            help="输出格式 (默认: table)")
