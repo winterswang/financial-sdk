@@ -106,6 +106,25 @@ def _transpose_for_display(df: pd.DataFrame) -> pd.DataFrame:
     if "stock_code" in df.index:
         df = df.drop(index=["stock_code"])
 
+    # 过滤掉非关键字段（元数据列、YOY同比列等）
+    rows_to_drop = []
+    for idx in df.index:
+        # 跳过元数据行
+        if idx in ["SECUCODE", "SECURITY_NAME_ABBR", "ORG_CODE", "ORG_TYPE",
+                   "REPORT_TYPE", "REPORT_DATE_NAME", "SECURITY_TYPE_CODE",
+                   "NOTICE_DATE", "UPDATE_DATE", "CURRENCY"]:
+            rows_to_drop.append(idx)
+            continue
+        # 跳过 YOY 同比列
+        if idx.endswith("_YOY") or "_YOY" in str(idx):
+            rows_to_drop.append(idx)
+            continue
+        # 跳过全为 NaN/- 的行
+        if df.loc[idx].isna().all() or (df.loc[idx] == "-").all():
+            rows_to_drop.append(idx)
+
+    df = df.drop(index=rows_to_drop, errors="ignore")
+
     # 格式化数字列
     for col in df.columns:
         df[col] = df[col].apply(
