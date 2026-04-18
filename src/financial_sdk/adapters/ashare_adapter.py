@@ -264,7 +264,7 @@ class ASHareAdapter(BaseAdapter):
 
         try:
             # AkShare的资产负债表接口
-            df = akshare.stock_profit_sheet_by_report_em(
+            df = akshare.stock_balance_sheet_by_report_em(
                 symbol=self._extract_stock_code(stock_code)
             )
             self._validate_not_empty(df, stock_code, "balance_sheet")
