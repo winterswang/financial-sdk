@@ -1,5 +1,5 @@
 # A股字段映射配置
-# AkShare字段名 -> 标准字段名
+# AkShare A股字段名 -> 标准字段名
 
 balance_sheet:
   # 必需字段
@@ -13,14 +13,29 @@ balance_sheet:
   TOTAL_LIABILITIES: "total_liabilities"
   TOTAL_EQUITY: "total_equity"
 
-  # 可选字段
+  # 资产类
   FIXED_ASSETS: "fixed_assets"
   INTANGIBLE_ASSETS: "intangible_assets"
+  GOODWILL: "goodwill"
   ACCOUNTS_RECEIVABLE: "accounts_receivable"
   INVENTORIES: "inventory"
+  CASH_AND_EQUIVALENTS: "cash_and_equivalents"
+  SHORT_TERM_INVESTMENTS: "short_term_investments"
+  OTHER_CURRENT_ASSETS: "other_current_assets"
+
+  # 负债类
   ACCOUNTS_PAYABLE: "accounts_payable"
   SHORT_TERM_BORROWINGS: "short_term_debt"
   LONG_TERM_BORROWINGS: "long_term_debt"
+  NOTES_PAYABLE: "notes_payable"
+  OTHER_CURRENT_LIABILITIES: "other_current_liabilities"
+  OTHER_NON_CURRENT_LIABILITIES: "other_non_current_liabilities"
+
+  # 权益类
+  SHARE_CAPITAL: "share_capital"
+  CAPITAL_RESERVE: "capital_reserve"
+  RETAINED_EARNINGS: "retained_earnings"
+  MINORITY_INTEREST: "minority_interests"
 
 income_statement:
   # 必需字段
@@ -34,13 +49,29 @@ income_statement:
   NET_PROFIT: "net_profit"
   BASIC_EPS: "eps"
 
-  # 可选字段
-  OPERATING_EXPENSE: "operating_cost"
+  # 收入成本
+  REVENUE: "revenue"
+  TOTAL_OPERATING_COST: "total_cost"
+  OPERATING_COST: "operating_cost"
+  COST_OF_GOODS_SOLD: "cost_of_goods_sold"
+
+  # 费用类
   SELLING_EXPENSE: "selling_expense"
   ADMINISTRATIVE_EXPENSE: "admin_expense"
   FINANCIAL_EXPENSE: "financial_expense"
   RD_EXPENSE: "rd_expense"
-  INCOME_TAX_EXPENSE: "tax_expense"
+  OPERATING_EXPENSE: "operating_expense"
+  TAXES_AND_SURCHARGES: "taxes_and_surcharges"
+  TAX_EXPENSE: "tax_expense"
+
+  # 收益类
+  INVESTMENT_INCOME: "investment_income"
+  OTHER_GAINS: "other_gains"
+  GAINS_FROM_FAIR_VALUE_CHANGES: "gains_from_fair_value_changes"
+
+  # 每股数据
+  BASIC_EPS: "eps"
+  DILUTED_EPS: "diluted_eps"
 
 cash_flow:
   # 必需字段
@@ -51,15 +82,90 @@ cash_flow:
   NETCASH_FINANCE: "financing_cash_flow"
   CCE_ADD: "net_cash_flow"
 
-  # 可选字段
-  BEGIN_CASH: "beginning_cash"
-  END_CASH: "ending_cash"
+  # 经营活动
   OPERATE_INFLOW: "operating_inflow"
   OPERATE_OUTFLOW: "operating_outflow"
+  OPERATE_INFLOW_OTHER: "other_operating_inflow"
+  OPERATE_OUTFLOW_OTHER: "other_operating_outflow"
+  TOTAL_OPERATE_INFLOW: "total_operating_inflow"
+  TOTAL_OPERATE_OUTFLOW: "total_operating_outflow"
+
+  # 经营活动调整
+  NETPROFIT: "net_profit_for_cash"
+  DEPRECIATION: "depreciation"
+  AMORTIZATION: "amortization"
+  DEPRECIATION_AMORTIZATION: "depreciation_amortization"
+  ASSET_IMPAIRMENT: "asset_impairment"
+  FAIRVALUE_CHANGE_LOSS: "fair_value_change_loss"
+  FINANCE_EXPENSE: "finance_expense"
+  INVEST_LOSS: "investment_loss"
+  DEFER_TAX: "deferred_tax"
+  DT_ASSET_REDUCE: "deferred_tax_asset_reduction"
+  DT_LIAB_ADD: "deferred_tax_liability_increase"
+  INVENTORY_REDUCE: "inventory_decrease"
+  INVENTORY_CHANGE: "inventory_change"
+  OPERATE_RECE_REDUCE: "accounts_receivable_decrease"
+  OPERATE_RECE_ADD: "accounts_receivable_increase"
+  OPERATE_PAYABLE_ADD: "accounts_payable_increase"
+  OPERATE_PAYABLE_REDUCE: "accounts_payable_decrease"
+  PREPAID_EXPENSE_REDUCE: "prepaid_expense_decrease"
+  ACCRUED_EXPENSE_ADD: "accrued_expense_increase"
+  RECEIVE_TAX_REFUND: "tax_refund_received"
+  TAX_PAI: "tax_paid"
+  TAX_REFUND: "tax_refund"
+  PAY_ALL_TAX: "taxes_paid"
+  PAY_STAFF_CASH: "staff_cash_paid"
+  PAY_OTHER_OPERATE: "other_operating_cash_paid"
+
+  # 投资活动
   INVEST_INFLOW: "investing_inflow"
   INVEST_OUTFLOW: "investing_outflow"
+  TOTAL_INVEST_INFLOW: "total_investing_inflow"
+  TOTAL_INVEST_OUTFLOW: "total_investing_outflow"
+  WITHDRAW_INVEST: "withdraw_investment"
+  RECEIVE_INVEST_INCOME: "dividend_income_received"
+  DISPOSAL_LONG_ASSET: "proceeds_from_disposal_of_fixed_assets"
+  DISPOSAL_SUBSIDIARY_OTHER: "proceeds_from_disposal_of_subsidiaries"
+  CONSTRUCT_LONG_ASSET: "construction_in_progress"
+  CAPEX: "capex"
+  INVEST_PAY_CASH: "investment_cash_paid"
+  PAY_OTHER_INVEST: "other_investing_cash_paid"
+
+  # 筹资活动
   FINANCE_INFLOW: "financing_inflow"
   FINANCE_OUTFLOW: "financing_outflow"
+  TOTAL_FINANCE_INFLOW: "total_financing_inflow"
+  TOTAL_FINANCE_OUTFLOW: "total_financing_outflow"
+  ACCEPT_INVEST_CASH: "proceeds_from_equity_investment"
+  SUBSIDIARY_ACCEPT_INVEST: "proceeds_from_subsidiary_equity_investment"
+  RECEIVE_LOAN_CASH: "proceeds_from_borrowings"
+  ISSUE_BOND: "proceeds_from_bonds"
+  RECEIVE_OTHER_FINANCE: "other_financing_inflow"
+  PAY_DEBT_CASH: "debt_repayment"
+  REPAYMENT_OF_BORROWINGS: "repayment_of_borrowings"
+  REPAYMENT_OF_BONDS: "bond_repayment"
+  ASSIGN_DIVIDEND_PORFIT: "dividends_paid"
+  DIVIDENDS_PAI: "dividends_paid"
+  SUBSIDIARY_PAY_DIVIDEND: "dividends_paid_to_minority"
+  BUY_SUBSIDIARY_EQUITY: "acquisition_of_minority_interests"
+  PAY_OTHER_FINANCE: "other_financing_cash_paid"
+
+  # 现金及等价物
+  BEGIN_CASH: "beginning_cash"
+  END_CASH: "ending_cash"
+  BEGIN_CCE: "beginning_cash_equivalents"
+  END_CCE: "ending_cash_equivalents"
+  CCE_ADD_OTHER: "other_changes_in_cash"
+  CCE_ADD_BALANCE: "cash_equivalent_net_increase"
+
+  # 汇率影响
+  RATE_CHANGE_EFFECT: "effect_of_exchange_rate_changes"
+  FOREIGN_EXCHANGE_LOSS: "foreign_exchange_loss"
+  END_CASH_EQUIVALENTS: "ending_cash_equivalents"
+  BEGIN_CASH_EQUIVALENTS: "beginning_cash_equivalents"
+
+  # 其他
+  NETPROFIT: "net_profit"
 
 indicators:
   # 必需字段
@@ -71,11 +177,15 @@ indicators:
   NET_PROFIT_RATIO: "net_margin"
   BASIC_EPS: "eps"
 
-  # 可选字段
+  # 比率类
   CURRENT_RATIO: "current_ratio"
   QUICK_RATIO: "quick_ratio"
-  DEBT_ASSET_RATIO: "debt_to_equity"
-  ASSET_TURNOVER: "asset_turnover"
+  DEBT_ASSET_RATIO: "debt_to_assets"
+  DEBT_EQUITY_RATIO: "debt_to_equity"
+
+  # 每股数据
   BPS: "bvps"
   PE_RATIO: "pe_ratio"
   PB_RATIO: "pb_ratio"
+  OPERATE_INCOME: "revenue"
+  GROSS_PROFIT: "gross_profit"
