@@ -71,6 +71,50 @@ def _format_number(x: float) -> str:
         return f"{x:.2f}"
 
 
+def _transpose_for_display(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    转置 DataFrame 用于展示：
+    - 每行一个指标（字段名）
+    - 每列一个报告期（日期）
+    - 日期从新到旧排序（最新在左）
+    """
+    if df is None or df.empty:
+        return df
+
+    df = df.copy()
+
+    # 移除内部字段
+    cols_to_drop = [c for c in df.columns if c.startswith("_")]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+
+    if "report_date" not in df.columns:
+        return df
+
+    # 按日期排序（最新在前）
+    df["_sort_date"] = pd.to_datetime(df["report_date"])
+    df = df.sort_values("_sort_date", ascending=False)
+    df = df.drop(columns=["_sort_date"])
+
+    # 转置：日期变列名，字段名变行
+    df = df.set_index("report_date").T
+
+    # 重命名日期列（去掉时间部分）
+    df.columns = [pd.to_datetime(c).strftime("%Y-%m-%d") for c in df.columns]
+
+    # 移除 stock_code 行
+    if "stock_code" in df.index:
+        df = df.drop(index=["stock_code"])
+
+    # 格式化数字列
+    for col in df.columns:
+        df[col] = df[col].apply(
+            lambda x: _format_number(x) if pd.notna(x) and isinstance(x, (int, float)) else x
+        )
+
+    return df
+
+
 def _filter_by_year(df: pd.DataFrame, year_spec: str) -> pd.DataFrame:
     """
     按年份筛选数据
@@ -149,7 +193,11 @@ def cmd_get(args):
 
                 print(f"\n=== {report_name} ({len(df)} 行) ===")
                 if args.format == "table":
-                    # 格式化数据用于展示
+                    # 转置格式：指标为行，日期为列（最新在左）
+                    display_df = _transpose_for_display(df)
+                    print(display_df.to_string())
+                elif args.format == "wide":
+                    # 宽表格式：原始横向展示
                     display_df = _format_dataframe_for_display(df)
                     print(display_df.to_string(index=False))
                 else:
@@ -224,8 +272,8 @@ def main():
     get_parser.add_argument("--year", "-y",
                            help="指定年份筛选，支持: 2024 或 2023,2024 或 2020-2024")
     get_parser.add_argument("--format", default="table",
-                           choices=["table", "json"],
-                           help="输出格式 (默认: table)")
+                           choices=["table", "wide", "json"],
+                           help="输出格式: table=指标为行(默认), wide=横向表格, json=JSON")
 
     # health 命令
     subparsers.add_parser("health", help="健康检查")
