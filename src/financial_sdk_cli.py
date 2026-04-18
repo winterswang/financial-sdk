@@ -290,8 +290,27 @@ def main():
     args = parser.parse_args()
 
     if args.command is None:
-        parser.print_help()
-        return 1
+        print("""
+╔══════════════════════════════════════════════════════════════╗
+║              Financial SDK CLI - 财务数据工具                ║
+╠══════════════════════════════════════════════════════════════╣
+║  使用 help 查看详细帮助:                                     ║
+║                                                              ║
+║    financial-sdk --help              查看全局帮助             ║
+║    financial-sdk get --help          查看 get 命令帮助        ║
+║    financial-sdk stocks --help       查看 stocks 命令帮助     ║
+║                                                              ║
+║  快速开始:                                                   ║
+║                                                              ║
+║    financial-sdk get 9992.HK income_statement annual         ║
+║    financial-sdk get 0700.HK all quarterly -y 2024           ║
+║    financial-sdk health                                      ║
+║    financial-sdk stocks --market HK                          ║
+║                                                              ║
+║  支持市场: A股(600000.SH)  港股(9992.HK)  美股(AAPL)         ║
+╚══════════════════════════════════════════════════════════════╝
+        """)
+        return 0
 
     if args.command == "get":
         return cmd_get(args)
