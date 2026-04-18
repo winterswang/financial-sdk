@@ -22,6 +22,37 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from financial_sdk import FinancialFacade
 
+# 标准化的核心指标列表（跨市场统一）
+STANDARD_FIELDS = {
+    # 现金流
+    "operating_cash_flow", "investing_cash_flow", "financing_cash_flow",
+    "net_cash_flow", "beginning_cash", "ending_cash",
+    "total_operating_inflow", "total_operating_outflow",
+    "total_investing_inflow", "total_investing_outflow",
+    "total_financing_inflow", "total_financing_outflow",
+    "capex", "dividends_paid", "debt_repayment",
+    "staff_cash_paid", "taxes_paid", "tax_refund_received",
+    "depreciation_amortization", "profit_before_tax",
+    # 资产负债表
+    "total_assets", "total_liabilities", "total_equity",
+    "current_assets", "non_current_assets",
+    "current_liabilities", "non_current_liabilities",
+    "fixed_assets", "intangible_assets", "goodwill",
+    "accounts_receivable", "inventory", "accounts_payable",
+    "short_term_debt", "long_term_debt", "cash_and_equivalents",
+    # 利润表
+    "revenue", "total_cost", "gross_profit",
+    "operating_profit", "net_profit",
+    "selling_expense", "admin_expense", "financial_expense", "rd_expense",
+    "tax_expense", "eps", "diluted_eps",
+    # 指标
+    "roe", "roa", "gross_margin", "net_margin",
+    "current_ratio", "quick_ratio", "debt_to_assets", "debt_to_equity",
+    "bvps", "pe_ratio", "pb_ratio",
+    # 其他
+    "report_date", "stock_code",
+}
+
 
 def _format_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -71,7 +102,7 @@ def _format_number(x: float) -> str:
         return f"{x:.2f}"
 
 
-def _transpose_for_display(df: pd.DataFrame) -> pd.DataFrame:
+def _transpose_for_display(df: pd.DataFrame, standard_only: bool = False) -> pd.DataFrame:
     """
     转置 DataFrame 用于展示：
     - 每行一个指标（字段名）
@@ -117,6 +148,10 @@ def _transpose_for_display(df: pd.DataFrame) -> pd.DataFrame:
             continue
         # 跳过 YOY 同比列
         if idx.endswith("_YOY") or "_YOY" in str(idx):
+            rows_to_drop.append(idx)
+            continue
+        # 如果启用标准字段过滤，只保留标准化指标
+        if standard_only and idx not in STANDARD_FIELDS:
             rows_to_drop.append(idx)
             continue
         # 跳过全为 NaN/- 的行
@@ -213,7 +248,7 @@ def cmd_get(args):
                 print(f"\n=== {report_name} ({len(df)} 行) ===")
                 if args.format == "table":
                     # 转置格式：指标为行，日期为列（最新在左）
-                    display_df = _transpose_for_display(df)
+                    display_df = _transpose_for_display(df, standard_only=args.standard_only)
                     print(display_df.to_string())
                 elif args.format == "wide":
                     # 宽表格式：原始横向展示
@@ -293,6 +328,9 @@ def main():
     get_parser.add_argument("--format", default="table",
                            choices=["table", "wide", "json"],
                            help="输出格式: table=指标为行(默认), wide=横向表格, json=JSON")
+    get_parser.add_argument("--standard-only",
+                           action="store_true",
+                           help="仅显示标准化的核心指标")
 
     # health 命令
     subparsers.add_parser("health", help="健康检查")
