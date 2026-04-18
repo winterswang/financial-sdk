@@ -391,7 +391,7 @@ class ASHareAdapter(BaseAdapter):
             # 需要转换为：
             # REPORT_DATE | SECURITY_CODE | 指标1 | 指标2 | ...
 
-            df = self._pivot_indicators(df)
+            df = self._pivot_indicators(df, period)
             df = self._map_fields(df, "indicators")
             df = self._standardize_date_column(df, "report_date")
             return df
@@ -405,12 +405,13 @@ class ASHareAdapter(BaseAdapter):
                 adapter_name=self.adapter_name,
             )
 
-    def _pivot_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
+    def _pivot_indicators(self, df: pd.DataFrame, period: str = "annual") -> pd.DataFrame:
         """
         将 stock_financial_abstract 返回的长格式数据透视为宽格式
 
         Args:
             df: 原始 DataFrame
+            period: 报告期类型 ("annual" 或 "quarterly")
 
         Returns:
             pd.DataFrame: 透视后的宽格式 DataFrame
@@ -419,7 +420,15 @@ class ASHareAdapter(BaseAdapter):
             return df
 
         # 列名：选项、指标、然后是日期列
-        date_columns = [c for c in df.columns if c not in ["选项", "指标"]]
+        all_date_columns = [c for c in df.columns if c not in ["选项", "指标"]]
+
+        # 根据 period 过滤日期列
+        # 年度报告: MMDD = 1231
+        # 季度报告: MMDD = 0331, 0630, 0930
+        if period == "annual":
+            date_columns = [c for c in all_date_columns if c.endswith("1231")]
+        else:  # quarterly
+            date_columns = [c for c in all_date_columns if not c.endswith("1231")]
 
         # 获取所有指标名称
         indicator_names = df["指标"].tolist()
