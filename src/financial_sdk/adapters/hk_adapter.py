@@ -243,7 +243,9 @@ class HKAdapter(BaseAdapter):
 
     def _extract_stock_code(self, stock_code: str) -> str:
         """从标准格式提取 AkShare 需要的代码格式 (如 0700.HK -> 00700)"""
-        return stock_code.replace(".HK", "")
+        code = stock_code.replace(".HK", "")
+        # AkShare 需要5位数字，补前导零
+        return code.zfill(5)
 
     def _map_fields(self, df: pd.DataFrame, report_type: str) -> pd.DataFrame:
         """

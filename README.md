@@ -95,6 +95,37 @@ bundle.is_partial      # 是否为部分数据
 bundle.warnings        # 警告信息列表
 ```
 
+## MCP Server
+
+SDK 已发布为 MCP Server，可在 OpenClaw 中使用：
+
+```bash
+pip install mcp
+openclaw mcp set financial-sdk '{"command": "python3", "args": ["/path/to/financial_sdk_mcp_server.py"]}'
+```
+
+### MCP 工具
+
+| 工具 | 描述 | 参数 |
+|------|------|------|
+| `get_financial_data` | 获取股票财务报表，支持 A股/港股/美股 | `stock_code`, `report_type`, `period`, `force_refresh` |
+| `get_supported_stocks` | 获取支持的股票列表 | `market` |
+| `health_check` | SDK 健康状态检查 | 无 |
+| `get_cache_stats` | 缓存命中率统计 | 无 |
+
+### 使用示例
+
+```
+# 获取泡泡玛特财务数据
+get_financial_data(stock_code="9992.HK", report_type="income_statement", period="annual")
+
+# 获取腾讯健康检查
+health_check()
+
+# 获取缓存统计
+get_cache_stats()
+```
+
 ## 项目结构
 
 ```
@@ -113,6 +144,7 @@ financial-sdk/
 │       ├── ashare_adapter.py   # A股适配器
 │       ├── hk_adapter.py       # 港股适配器
 │       └── us_adapter.py       # 美股适配器
+├── src/financial_sdk_mcp_server.py  # MCP Server 入口
 ├── tests/                      # 测试文件
 ├── config/                     # 配置文件
 ├── pyproject.toml
