@@ -23,6 +23,54 @@ sys.path.insert(0, str(Path(__file__).parent))
 from financial_sdk import FinancialFacade
 
 
+def _format_dataframe_for_display(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    格式化 DataFrame 用于展示：
+    1. 移除内部字段（以 _ 开头）
+    2. 格式化日期列
+    3. 格式化数字列（太大或太小的数字用科学计数，其他保留合理小数位）
+    """
+    if df is None or df.empty:
+        return df
+
+    df = df.copy()
+
+    # 移除内部字段
+    cols_to_drop = [c for c in df.columns if c.startswith("_")]
+    if cols_to_drop:
+        df = df.drop(columns=cols_to_drop)
+
+    # 格式化日期列
+    if "report_date" in df.columns:
+        df["report_date"] = pd.to_datetime(df["report_date"]).dt.strftime("%Y-%m-%d")
+
+    # 格式化数字列
+    for col in df.columns:
+        if col in ["report_date", "stock_code"]:
+            continue
+        if df[col].dtype in ["float64", "float32"]:
+            # 格式化大数字和科学计数
+            df[col] = df[col].apply(lambda x: _format_number(x) if pd.notna(x) else "-")
+
+    return df
+
+
+def _format_number(x: float) -> str:
+    """格式化数字，太大用 B/M/K 后缀，太小用科学计数"""
+    if pd.isna(x):
+        return "-"
+    if abs(x) >= 1e9:
+        return f"{x / 1e9:.2f}B"
+    elif abs(x) >= 1e6:
+        return f"{x / 1e6:.2f}M"
+    elif abs(x) >= 1e3:
+        return f"{x / 1e3:.2f}K"
+    elif abs(x) < 0.01 and x != 0:
+        return f"{x:.2e}"
+    else:
+        return f"{x:.2f}"
+
+
 def _filter_by_year(df: pd.DataFrame, year_spec: str) -> pd.DataFrame:
     """
     按年份筛选数据
@@ -101,9 +149,11 @@ def cmd_get(args):
 
                 print(f"\n=== {report_name} ({len(df)} 行) ===")
                 if args.format == "table":
-                    print(df.to_string(index=False))
+                    # 格式化数据用于展示
+                    display_df = _format_dataframe_for_display(df)
+                    print(display_df.to_string(index=False))
                 else:
-                    # JSON 友好格式
+                    # JSON 友好格式（原始数据）
                     records = df.to_dict(orient="records")
                     print(json.dumps(records, ensure_ascii=False, indent=2, default=str))
 
