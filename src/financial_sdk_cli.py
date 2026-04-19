@@ -5,6 +5,7 @@ Financial SDK CLI
 Usage:
     financial-sdk get 9992.HK income_statement annual
     financial-sdk get 9992.HK all annual --force-refresh
+    financial-sdk analyze 600000.SH
     financial-sdk health
     financial-sdk stocks --market HK
     financial-sdk cache
@@ -21,6 +22,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).parent))
 
 from financial_sdk import FinancialFacade
+from financial_sdk.analytics import FinancialAnalytics
 
 # 标准化的核心指标列表（跨市场统一）
 STANDARD_FIELDS = {
@@ -238,7 +240,7 @@ def cmd_get(args):
         print(f"数据年份: {bundle.report_periods}")
 
         if bundle.is_partial:
-            print(f"\n警告 (部分数据):")
+            print("\n警告 (部分数据):")
             for w in bundle.warnings:
                 print(f"  - {w}")
 
@@ -300,18 +302,484 @@ def cmd_cache(args):
     return 0
 
 
+def _format_analysis_table(report, years_filter=None):
+    """
+    格式化分析报告为表格形式 (指标为行，日期为列)
+
+    Args:
+        report: FullAnalysisReport 对象
+        years_filter: 年份列表过滤
+
+    Returns:
+        格式化的字符串
+    """
+    lines = []
+    width = 80
+
+    # 收集所有日期
+    dates = []
+    if report.valuation and report.valuation.report_date:
+        dates.append(report.valuation.report_date)
+    if report.profitability and report.profitability.report_date:
+        if report.profitability.report_date not in dates:
+            dates.append(report.profitability.report_date)
+    if report.efficiency and report.efficiency.report_date:
+        if report.efficiency.report_date not in dates:
+            dates.append(report.efficiency.report_date)
+    if report.growth and report.growth.report_date:
+        if report.growth.report_date not in dates:
+            dates.append(report.growth.report_date)
+    if report.safety and report.safety.report_date:
+        if report.safety.report_date not in dates:
+            dates.append(report.safety.report_date)
+
+    # 按日期排序（最新在前）
+    dates = sorted(set(dates), reverse=True)
+
+    # 过滤年份
+    if years_filter:
+        filtered_dates = []
+        for d in dates:
+            try:
+                year = int(str(d)[:4])
+                if year in years_filter:
+                    filtered_dates.append(d)
+            except (ValueError, IndexError):
+                pass
+        dates = filtered_dates
+
+    if not dates:
+        return "无可用数据"
+
+    # 表头
+    header = f"{'指标':<25}" + "".join([f"{d:>15}" for d in dates])
+    lines.append("=" * width)
+    lines.append(f"  Financial Analysis: {report.stock_code} (多期对比)")
+    lines.append(f"  综合评分: {report.get_score():.1f}/100")
+    lines.append("=" * width)
+    lines.append(header)
+    lines.append("-" * width)
+
+    # Valuation 指标
+    if report.valuation:
+        lines.append("\n【估值指标 Valuation】")
+        v = report.valuation
+        metrics_map = [
+            ("市盈率 (P/E)", v.pe_ratio, True),
+            ("市净率 (P/B)", v.pb_ratio, True),
+            ("市销率 (P/S)", v.ps_ratio, True),
+            ("总市值", v.market_cap, False),
+            ("股息率", v.dividend_yield, True),
+            ("EPS", v.eps, False),
+        ]
+        for name, value, is_percent in metrics_map:
+            if value is not None:
+                if is_percent and abs(value) < 10:
+                    val_str = f"{value*100:.2f}%" if value else "-"
+                else:
+                    val_str = _format_number(value) if value else "-"
+                lines.append(f"  {name:<23}" + "".join([f"{val_str:>15}" for _ in dates]))
+
+    # Profitability 指标
+    if report.profitability:
+        lines.append("\n【盈利能力 Profitability】")
+        p = report.profitability
+        metrics_map = [
+            ("ROE", p.roe, True),
+            ("ROA", p.roa, True),
+            ("ROIC", p.roic, True),
+            ("毛利率", p.gross_margin, True),
+            ("净利率", p.net_margin, True),
+        ]
+        for name, value, is_percent in metrics_map:
+            if value is not None:
+                val_str = f"{value*100:.2f}%" if is_percent else (f"{value:.4f}" if value else "-")
+                lines.append(f"  {name:<23}" + "".join([f"{val_str:>15}" for _ in dates]))
+
+    # Efficiency 指标
+    if report.efficiency:
+        lines.append("\n【运营效率 Efficiency】")
+        e = report.efficiency
+        metrics_map = [
+            ("现金周转周期", e.cash_conversion_cycle, False),
+            ("营业周期", e.operating_cycle, False),
+            ("存货周转天数", e.dio, False),
+            ("应收账款周转天数", e.dso, False),
+            ("应付账款周转天数", e.dpo, False),
+        ]
+        for name, value, is_percent in metrics_map:
+            if value is not None:
+                val_str = f"{value:.1f}" if value else "-"
+                lines.append(f"  {name:<23}" + "".join([f"{val_str:>15}" for _ in dates]))
+
+    # Growth 指标
+    if report.growth:
+        lines.append("\n【成长性 Growth】")
+        g = report.growth
+        metrics_map = [
+            ("营收增长率", g.revenue_growth_yoy, True),
+            ("净利润增长率", g.profit_growth_yoy, True),
+            ("可持续增长率", g.sustainable_growth_rate, True),
+        ]
+        for name, value, is_percent in metrics_map:
+            if value is not None:
+                val_str = f"{value*100:.2f}%" if is_percent else (f"{value:.4f}" if value else "-")
+                lines.append(f"  {name:<23}" + "".join([f"{val_str:>15}" for _ in dates]))
+
+    # Safety 指标
+    if report.safety:
+        lines.append("\n【财务安全 Safety】")
+        s = report.safety
+        metrics_map = [
+            ("Altman Z-Score", s.altman_z_score, False),
+            ("流动比率", s.current_ratio, False),
+            ("速动比率", s.quick_ratio, False),
+            ("利息保障倍数", s.interest_coverage, False),
+            ("资产负债率", s.debt_to_equity, False),
+        ]
+        for name, value, is_percent in metrics_map:
+            if value is not None:
+                val_str = f"{value:.2f}" if value else "-"
+                lines.append(f"  {name:<23}" + "".join([f"{val_str:>15}" for _ in dates]))
+
+    lines.append("\n" + "=" * width)
+    return "\n".join(lines)
+
+
+def _format_multi_year_metrics(multi_year_data, years_filter=None):
+    """
+    格式化多年财务指标为表格形式 (指标为行，日期为列)
+
+    Args:
+        multi_year_data: get_multi_year_metrics 返回的数据
+        years_filter: 年份列表过滤
+
+    Returns:
+        格式化的字符串
+    """
+    lines = []
+    width = 100
+
+    dates = multi_year_data.get("report_dates", [])
+
+    # 过滤年份
+    if years_filter:
+        filtered_dates = []
+        for d in dates:
+            try:
+                year = int(str(d)[:4])
+                if year in years_filter:
+                    filtered_dates.append(d)
+            except (ValueError, IndexError):
+                pass
+        dates = filtered_dates
+
+    if not dates:
+        return "无可用数据"
+
+    stock_code = multi_year_data.get("stock_code", "N/A")
+
+    # 表头
+    lines.append("=" * width)
+    lines.append(f"  Financial Analysis: {stock_code} (多年对比)")
+    lines.append("=" * width)
+    header = f"{'指标':<28}" + "".join([f"{str(d):>16}" for d in dates])
+    lines.append(header)
+    lines.append("-" * width)
+
+    # Valuation 指标（最新一期）
+    valuation = multi_year_data.get("valuation")
+    if valuation:
+        lines.append("\n【估值指标 Valuation】(最新一期)")
+        v = valuation
+        metrics_map = [
+            ("市盈率 (P/E)", v.pe_ratio, "ratio"),
+            ("市净率 (P/B)", v.pb_ratio, "ratio"),
+            ("市销率 (P/S)", v.ps_ratio, "ratio"),
+            ("总市值 (亿)", v.market_cap, "market_cap"),
+            ("股息率", v.dividend_yield, "percent"),
+            ("EPS (元)", v.eps, "number"),
+        ]
+        for name, value, fmt in metrics_map:
+            if value is not None:
+                if fmt == "percent":
+                    val_str = f"{value*100:.2f}%"
+                elif fmt == "market_cap":
+                    val_str = f"{value/1e8:.2f}" if value else "-"
+                elif fmt == "ratio":
+                    # PE/PB/PS 是比率，不是百分比
+                    val_str = f"{value:.2f}" if value else "-"
+                else:
+                    val_str = f"{value:.4f}" if value else "-"
+                # 估值只有最新一期数据，显示在第一列
+                date_cols = [val_str if i == 0 else "-" for i in range(len(dates))]
+                lines.append(f"  {name:<26}" + "".join([f"{s:>16}" for s in date_cols]))
+    else:
+        lines.append("\n【估值指标 Valuation】")
+        lines.append("  估值数据不可用（请检查股票代码或网络连接）")
+
+    # Profitability 指标（多年）
+    profitability = multi_year_data.get("profitability", {})
+    if profitability:
+        lines.append("\n【盈利能力 Profitability】")
+        metrics_rows = {
+            "ROE": [], "ROA": [], "ROIC": [],
+            "毛利率": [], "净利率": [],
+        }
+        for date in dates:
+            p = profitability.get(date)
+            if p:
+                metrics_rows["ROE"].append(p.roe)
+                metrics_rows["ROA"].append(p.roa)
+                metrics_rows["ROIC"].append(p.roic)
+                metrics_rows["毛利率"].append(p.gross_margin)
+                metrics_rows["净利率"].append(p.net_margin)
+            else:
+                for k in metrics_rows:
+                    metrics_rows[k].append(None)
+
+        for name, values in metrics_rows.items():
+            if any(v is not None for v in values):
+                formatted = []
+                for v in values:
+                    if v is not None:
+                        formatted.append(f"{v*100:.2f}%")
+                    else:
+                        formatted.append("-")
+                lines.append(f"  {name:<26}" + "".join([f"{s:>16}" for s in formatted]))
+
+    # Efficiency 指标（多年）
+    efficiency = multi_year_data.get("efficiency", {})
+    if efficiency:
+        lines.append("\n【运营效率 Efficiency】")
+        metrics_rows = {
+            "现金周转周期": [], "营业周期": [],
+            "存货周转天数": [], "应收账款周转天数": [], "应付账款周转天数": [],
+        }
+        for date in dates:
+            e = efficiency.get(date)
+            if e:
+                metrics_rows["现金周转周期"].append(e.cash_conversion_cycle)
+                metrics_rows["营业周期"].append(e.operating_cycle)
+                metrics_rows["存货周转天数"].append(e.dio)
+                metrics_rows["应收账款周转天数"].append(e.dso)
+                metrics_rows["应付账款周转天数"].append(e.dpo)
+            else:
+                for k in metrics_rows:
+                    metrics_rows[k].append(None)
+
+        for name, values in metrics_rows.items():
+            if any(v is not None for v in values):
+                formatted = []
+                for v in values:
+                    if v is not None:
+                        formatted.append(f"{v:.1f}")
+                    else:
+                        formatted.append("-")
+                lines.append(f"  {name:<26}" + "".join([f"{s:>16}" for s in formatted]))
+
+    # Growth 指标（多年）
+    growth = multi_year_data.get("growth", {})
+    if growth:
+        lines.append("\n【成长性 Growth】")
+        metrics_rows = {
+            "营收增长率": [], "净利润增长率": [], "可持续增长率": [],
+        }
+        for date in dates:
+            g = growth.get(date)
+            if g:
+                metrics_rows["营收增长率"].append(g.revenue_growth_yoy)
+                metrics_rows["净利润增长率"].append(g.profit_growth_yoy)
+                metrics_rows["可持续增长率"].append(g.sustainable_growth_rate)
+            else:
+                for k in metrics_rows:
+                    metrics_rows[k].append(None)
+
+        for name, values in metrics_rows.items():
+            if any(v is not None for v in values):
+                formatted = []
+                for v in values:
+                    if v is not None:
+                        formatted.append(f"{v*100:.2f}%")
+                    else:
+                        formatted.append("-")
+                lines.append(f"  {name:<26}" + "".join([f"{s:>16}" for s in formatted]))
+
+    # Safety 指标（多年）
+    safety = multi_year_data.get("safety", {})
+    if safety:
+        lines.append("\n【财务安全 Safety】")
+        metrics_rows = {
+            "Altman Z-Score": [], "流动比率": [],
+            "速动比率": [], "利息保障倍数": [], "资产负债率": [],
+        }
+        for date in dates:
+            s = safety.get(date)
+            if s:
+                metrics_rows["Altman Z-Score"].append(s.altman_z_score)
+                metrics_rows["流动比率"].append(s.current_ratio)
+                metrics_rows["速动比率"].append(s.quick_ratio)
+                metrics_rows["利息保障倍数"].append(s.interest_coverage)
+                metrics_rows["资产负债率"].append(s.debt_to_equity)
+            else:
+                for k in metrics_rows:
+                    metrics_rows[k].append(None)
+
+        for name, values in metrics_rows.items():
+            if any(v is not None for v in values):
+                formatted = []
+                for v in values:
+                    if v is not None:
+                        formatted.append(f"{v:.2f}")
+                    else:
+                        formatted.append("-")
+                lines.append(f"  {name:<26}" + "".join([f"{s:>16}" for s in formatted]))
+
+    lines.append("\n" + "=" * width)
+    return "\n".join(lines)
+
+
+def _parse_year_filter(year_spec):
+    """解析年份过滤参数"""
+    if not year_spec:
+        return None
+    years = set()
+    for part in year_spec.split(","):
+        part = part.strip()
+        if "-" in part:
+            start, end = part.split("-")
+            years.update(range(int(start), int(end) + 1))
+        else:
+            years.add(int(part))
+    return years
+
+
+def cmd_analyze(args):
+    """财务分析"""
+    analytics = FinancialAnalytics()
+
+    try:
+        # 解析年份过滤
+        years_filter = _parse_year_filter(args.year) if args.year else None
+
+        if args.dimension:
+            # 获取特定维度分析
+            dimension = args.dimension.lower()
+
+            if dimension == "valuation":
+                metrics = analytics.get_valuation(args.stock_code, args.period)
+                if metrics:
+                    print(f"=== 估值分析 ({args.stock_code}) ===")
+                    data = metrics.to_dict()
+                    print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+                else:
+                    print(f"无法获取 {args.stock_code} 的估值数据", file=sys.stderr)
+                    return 1
+
+            elif dimension == "profitability":
+                metrics = analytics.get_profitability(args.stock_code, args.period)
+                if metrics:
+                    print(f"=== 盈利能力分析 ({args.stock_code}) ===")
+                    data = metrics.to_dict()
+                    print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+                else:
+                    print(f"无法获取 {args.stock_code} 的盈利能力数据", file=sys.stderr)
+                    return 1
+
+            elif dimension == "efficiency":
+                metrics = analytics.get_efficiency(args.stock_code, args.period)
+                if metrics:
+                    print(f"=== 运营效率分析 ({args.stock_code}) ===")
+                    data = metrics.to_dict()
+                    print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+                else:
+                    print(f"无法获取 {args.stock_code} 的运营效率数据", file=sys.stderr)
+                    return 1
+
+            elif dimension == "growth":
+                metrics = analytics.get_growth(args.stock_code, args.period)
+                if metrics:
+                    print(f"=== 成长性分析 ({args.stock_code}) ===")
+                    data = metrics.to_dict()
+                    print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+                else:
+                    print(f"无法获取 {args.stock_code} 的成长性数据", file=sys.stderr)
+                    return 1
+
+            elif dimension == "safety":
+                metrics = analytics.get_safety(args.stock_code, args.period)
+                if metrics:
+                    print(f"=== 财务安全分析 ({args.stock_code}) ===")
+                    data = metrics.to_dict()
+                    print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+                else:
+                    print(f"无法获取 {args.stock_code} 的财务安全数据", file=sys.stderr)
+                    return 1
+
+            else:
+                print(f"未知维度: {dimension}", file=sys.stderr)
+                print("支持的维度: valuation, profitability, efficiency, growth, safety")
+                return 1
+
+        else:
+            # 获取完整分析报告
+            if args.format == "table":
+                # 多年表格格式
+                multi_year_data = analytics.get_multi_year_metrics(
+                    args.stock_code, args.period
+                )
+                if not multi_year_data or not multi_year_data.get("report_dates"):
+                    print(f"无法获取 {args.stock_code} 的多年数据", file=sys.stderr)
+                    return 1
+                print(_format_multi_year_metrics(multi_year_data, years_filter))
+            else:
+                # 其他格式使用完整报告
+                report = analytics.get_full_report(args.stock_code, args.period)
+
+                if report is None:
+                    print(f"无法获取 {args.stock_code} 的分析数据", file=sys.stderr)
+                    return 1
+
+                if args.format == "json":
+                    print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2, default=str))
+                elif args.format == "summary":
+                    summary = report.get_summary()
+                    print(f"=== 财务分析摘要 ({args.stock_code}) ===")
+                    print(json.dumps(summary, ensure_ascii=False, indent=2, default=str))
+                else:
+                    # pretty print 格式化输出
+                    print(report.pretty_print())
+
+        return 0
+
+    except Exception as e:
+        print(f"错误: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Financial SDK CLI - 财务数据获取工具",
+        description="Financial SDK CLI - 财务数据获取和分析工具",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 示例:
+  # 获取财务数据
   financial-sdk get 9992.HK income_statement annual
-  financial-sdk get 9992.HK income_statement annual --year 2024
-  financial-sdk get 9992.HK income_statement annual --year 2023,2024
-  financial-sdk get 9992.HK income_statement annual -y 2020-2024
   financial-sdk get 0700.HK all quarterly --force-refresh
   financial-sdk get AAPL balance_sheet annual --format json
+
+  # 财务分析
+  financial-sdk analyze 600000.SH
+  financial-sdk analyze 600000.SH --format json
+  financial-sdk analyze 600000.SH -d valuation
+  financial-sdk analyze 600000.SH -d profitability
+  financial-sdk analyze 0700.HK -d efficiency
+  financial-sdk analyze 600000.SH --format table
+  financial-sdk analyze 600000.SH --format table -y 2023,2024
+
+  # 系统命令
   financial-sdk health
   financial-sdk stocks --market HK
   financial-sdk cache
@@ -352,25 +820,40 @@ def main():
     # cache 命令
     subparsers.add_parser("cache", help="缓存统计")
 
+    # analyze 命令
+    analyze_parser = subparsers.add_parser("analyze", help="财务分析")
+    analyze_parser.add_argument("stock_code", help="股票代码 (如 9992.HK, AAPL, 600000.SH)")
+    analyze_parser.add_argument("--period", default="annual",
+                               choices=["annual", "quarterly"],
+                               help="报告期类型 (默认: annual)")
+    analyze_parser.add_argument("--dimension", "-d",
+                               choices=["valuation", "profitability", "efficiency", "growth", "safety"],
+                               help="分析维度，不指定则输出完整报告")
+    analyze_parser.add_argument("--format", default="pretty",
+                               choices=["pretty", "json", "summary", "table"],
+                               help="输出格式: pretty=格式化报告(默认), json=JSON, summary=摘要, table=表格(多期)")
+    analyze_parser.add_argument("--year", "-y",
+                               help="指定年份筛选，支持: 2024 或 2023,2024 或 2020-2024 (仅table格式)")
+
     args = parser.parse_args()
 
     if args.command is None:
         print("""
 ╔══════════════════════════════════════════════════════════════╗
-║              Financial SDK CLI - 财务数据工具                ║
+║          Financial SDK CLI - 财务数据获取和分析工具           ║
 ╠══════════════════════════════════════════════════════════════╣
 ║  使用 help 查看详细帮助:                                     ║
 ║                                                              ║
 ║    financial-sdk --help              查看全局帮助             ║
 ║    financial-sdk get --help          查看 get 命令帮助        ║
-║    financial-sdk stocks --help       查看 stocks 命令帮助     ║
+║    financial-sdk analyze --help      查看 analyze 命令帮助   ║
 ║                                                              ║
 ║  快速开始:                                                   ║
 ║                                                              ║
 ║    financial-sdk get 9992.HK income_statement annual         ║
-║    financial-sdk get 0700.HK all quarterly -y 2024           ║
+║    financial-sdk analyze 600000.SH                           ║
+║    financial-sdk analyze 600000.SH -d valuation              ║
 ║    financial-sdk health                                      ║
-║    financial-sdk stocks --market HK                          ║
 ║                                                              ║
 ║  支持市场: A股(600000.SH)  港股(9992.HK)  美股(AAPL)         ║
 ╚══════════════════════════════════════════════════════════════╝
@@ -385,6 +868,8 @@ def main():
         return cmd_stocks(args)
     elif args.command == "cache":
         return cmd_cache(args)
+    elif args.command == "analyze":
+        return cmd_analyze(args)
     else:
         parser.print_help()
         return 1
