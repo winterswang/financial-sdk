@@ -1,14 +1,16 @@
 # Financial SDK
 
-统一的财务数据 SDK，封装 A股、港股、美股的财务数据接口，提供标准化的三表（资产负债表、利润表、现金流量表）+ 财务指标获取。
+统一的财务数据 SDK，封装 A股、港股、美股的财务数据接口，提供标准化的三表（资产负债表、利润表、现金流量表）+ 财务指标获取，并提供高级财务分析和实时价格功能。
 
 ## 特性
 
 - **统一接口**: 通过门面模式提供简洁的公共 API
-- **多市场支持**: A 股（AkShare）、港股（AkShare）、美股（AkShare）
+- **多市场支持**: A 股（AkShare）、港股/美股（Longbridge + Yahoo Finance）
 - **数据标准化**: 统一的字段映射和数据格式
 - **缓存机制**: LRU 缓存 + TTL 过期策略
 - **监控统计**: P50/P90/P99 延迟统计、适配器健康状态
+- **财务分析**: 估值、盈利、效率、成长、安全五大维度分析
+- **实时价格**: 多数据源自动切换，支持自动 token 刷新
 
 ## 支持的数据
 
@@ -34,6 +36,12 @@ financial-sdk get 9992.HK income_statement annual
 financial-sdk get 0700.HK all quarterly --force-refresh
 financial-sdk get AAPL balance_sheet annual --format json
 
+# 财务分析
+financial-sdk analyze 600000.SH                    # 完整分析报告
+financial-sdk analyze 600000.SH -d valuation      # 指定维度分析
+financial-sdk analyze 600000.SH --format table     # 多年对比表格
+financial-sdk analyze 600000.SH --format table -y 2023,2024  # 筛选年份
+
 # 健康检查
 financial-sdk health
 
@@ -49,6 +57,7 @@ financial-sdk cache
 ```bash
 financial-sdk --help          # 查看所有命令
 financial-sdk get --help      # 查看 get 命令帮助
+financial-sdk analyze --help  # 查看 analyze 命令帮助
 ```
 
 ## 快速开始
@@ -122,6 +131,67 @@ bundle.is_partial      # 是否为部分数据
 bundle.warnings        # 警告信息列表
 ```
 
+### FinancialAnalytics
+
+财务分析入口类，提供五大维度分析。
+
+```python
+from financial_sdk.analytics import FinancialAnalytics
+
+analytics = FinancialAnalytics()
+
+# 完整分析报告
+report = analytics.get_full_report("0700.HK")
+
+# 获取多年数据（表格格式）
+multi_year = analytics.get_multi_year_metrics("0700.HK", years=[2023, 2024, 2025])
+
+# 指定维度分析
+metrics = analytics.get_valuation("0700.HK")
+metrics = analytics.get_profitability("0700.HK")
+metrics = analytics.get_efficiency("0700.HK")
+metrics = analytics.get_growth("0700.HK")
+metrics = analytics.get_safety("0700.HK")
+```
+
+**分析维度：**
+
+| 维度 | 类 | 指标 |
+|------|-----|------|
+| 估值 | ValuationAnalyzer | PE、PB、PS、PEG、EV/EBITDA、市值 |
+| 盈利 | ProfitabilityAnalyzer | ROE、ROA、ROIC、毛利率、净利率 |
+| 效率 | EfficiencyAnalyzer | DIO、DSO、DPO、营业周期、现金周转周期 |
+| 成长 | GrowthAnalyzer | YoY/QoQ增长率、可持续增长率 |
+| 安全 | SafetyAnalyzer | Altman Z-Score、流动比率、偿债能力 |
+
+### PriceProvider
+
+实时价格获取，支持多数据源自动切换。
+
+```python
+from financial_sdk import PriceProvider, get_price_provider
+
+provider = get_price_provider()
+
+# 获取价格
+result = provider.get_price("0700.HK")
+if result.success:
+    print(f"价格: {result.price.current_price} {result.price.currency}")
+    print(f"来源: {result.price.source}")  # longbridge / akshare / yahoo
+```
+
+**数据源优先级：**
+
+| 市场 | 主数据源 | 备用数据源 |
+|------|----------|------------|
+| A股 | AkShare | Yahoo Finance → Longbridge |
+| 港股 | Longbridge | Yahoo Finance → AkShare |
+| 美股 | Longbridge | Yahoo Finance |
+
+**Longbridge Token 刷新：**
+- Token 过期时自动刷新（方案C）
+- 无需手动干预
+
 ## MCP Server
 
 SDK 已发布为 MCP Server，可在 OpenClaw 中使用：
@@ -167,6 +237,18 @@ financial-sdk/
 │   ├── monitor.py              # 监控（P50/P90/P99 统计）
 │   ├── config.py               # 配置管理
 │   ├── exceptions.py           # 异常类定义
+│   ├── analytics/              # 财务分析模块
+│   │   ├── analytics_base.py   # 分析器基类
+│   │   ├── metrics_calculator.py # 指标计算引擎
+│   │   ├── valuation.py        # 估值分析器
+│   │   ├── profitability.py     # 盈利能力分析器
+│   │   ├── efficiency.py        # 运营效率分析器
+│   │   ├── growth.py            # 成长性分析器
+│   │   ├── safety.py            # 财务安全分析器
+│   │   └── unified.py           # 统一分析入口
+│   ├── price/                  # 价格获取模块
+│   │   ├── price_models.py      # 价格数据模型
+│   │   └── price_provider.py    # 多数据源价格提供者
 │   └── adapters/
 │       ├── ashare_adapter.py   # A股适配器
 │       ├── hk_adapter.py       # 港股适配器
@@ -179,7 +261,15 @@ financial-sdk/
 └── requirements.txt
 ```
 
-## 开发
+## 依赖
+
+- pandas >= 2.0.0
+- akshare >= 1.12.0
+- cachetools >= 5.0.0
+- PyYAML >= 6.0
+- requests >= 2.28.0
+- longport >= 3.0.0 (港股/美股实时行情)
+- pyjwt >= 2.0.0 (Token 解析)
 
 ### 运行测试
 
@@ -214,6 +304,8 @@ ruff format src/ tests/
 - cachetools >= 5.0.0
 - PyYAML >= 6.0
 - requests >= 2.28.0
+- longport >= 3.0.0 (港股/美股实时行情)
+- pyjwt >= 2.0.0 (Token 解析)
 
 ## 许可证
 
