@@ -46,9 +46,11 @@ class ASHareAdapter(BaseAdapter):
             # 使用默认配置
             # 项目结构: financial-sdk/src/financial_sdk/adapters/ashare_adapter.py
             #           financial-sdk/config/field_mapping.yaml
-            # 需要向上4级到达项目根目录
+            # src/financial_sdk/adapters/ -> 3 levels up to project root
             config_path = (
-                Path(__file__).parent.parent.parent.parent / "config" / "field_mapping.yaml"
+                Path(__file__).resolve().parent.parent.parent
+                / "config"
+                / "field_mapping.yaml"
             )
         else:
             config_path = Path(config_path)
@@ -381,7 +383,9 @@ class ASHareAdapter(BaseAdapter):
         try:
             # 使用 stock_financial_abstract 接口获取财务指标
             df = akshare.stock_financial_abstract(
-                symbol=self._extract_stock_code(stock_code).replace("SH", "").replace("SZ", "")
+                symbol=self._extract_stock_code(stock_code)
+                .replace("SH", "")
+                .replace("SZ", "")
             )
             self._validate_not_empty(df, stock_code, "indicators")
 
@@ -405,7 +409,9 @@ class ASHareAdapter(BaseAdapter):
                 adapter_name=self.adapter_name,
             )
 
-    def _pivot_indicators(self, df: pd.DataFrame, period: str = "annual") -> pd.DataFrame:
+    def _pivot_indicators(
+        self, df: pd.DataFrame, period: str = "annual"
+    ) -> pd.DataFrame:
         """
         将 stock_financial_abstract 返回的长格式数据透视为宽格式
 
@@ -429,9 +435,6 @@ class ASHareAdapter(BaseAdapter):
             date_columns = [c for c in all_date_columns if c.endswith("1231")]
         else:  # quarterly
             date_columns = [c for c in all_date_columns if not c.endswith("1231")]
-
-        # 获取所有指标名称
-        indicator_names = df["指标"].tolist()
 
         # 为每个日期创建一个行
         rows = []

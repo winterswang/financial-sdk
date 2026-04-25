@@ -245,7 +245,9 @@ class ValuationAnalyzer(BaseAnalyzer):
         indicators = fs_data["indicators"]
 
         # 获取关键财务指标
-        eps = self._get_value(income, "eps") or self._get_value(indicators, "eps")  # 优先使用利润表的EPS
+        eps = self._get_value(income, "eps") or self._get_value(
+            indicators, "eps"
+        )  # 优先使用利润表的EPS
         bvps = self._get_value(indicators, "bvps")  # 从指标表获取每股净资产
         revenue = self._get_value(income, "revenue")
         net_profit = self._get_value(income, "net_profit")
@@ -298,13 +300,20 @@ class ValuationAnalyzer(BaseAnalyzer):
             if yoy_growth:
                 peg_ratio = self._calculator.calculate_peg_ratio(pe_ratio, yoy_growth)
 
+        # 计算企业价值 (EV = 市值 + 债务 - 现金)
+        enterprise_value = None
+        if market_cap is not None and total_debt is not None:
+            enterprise_value = market_cap + total_debt
+            if cash is not None:
+                enterprise_value = enterprise_value - cash
+
         return ValuationMetrics(
             stock_code=stock_code,
             report_date=self._get_latest_report_date(income),
             current_price=current_price,
             currency=price_data.currency,
             market_cap=market_cap,
-            enterprise_value=ev_ebitda,  # 这里实际是 EV/EBITDA，先存疑
+            enterprise_value=enterprise_value,
             pe_ratio=pe_ratio,
             pb_ratio=pb_ratio,
             ps_ratio=ps_ratio,

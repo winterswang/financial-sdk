@@ -5,9 +5,15 @@
 """
 
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from .adapters import BaseAdapter, ASHareAdapter, HKAdapter, USAdapter
+from .adapters import (
+    BaseAdapter,
+    ASHareAdapter,
+    HKAdapter,
+    USAdapter,
+    LongbridgeCLIAdapter,
+)
 from .exceptions import InvalidStockCodeError, NoAdapterAvailableError
 from .monitor import FallbackStep, get_monitor
 
@@ -40,6 +46,13 @@ class AdapterManager:
 
     def _register_default_adapters(self) -> None:
         """注册默认适配器"""
+        # Longbridge CLI 适配器 (优先级最高)
+        try:
+            lb_adapter = LongbridgeCLIAdapter()
+            self.register_adapter(lb_adapter)
+        except Exception:
+            pass  # CLI 不可用时跳过
+
         # A股适配器
         ashare_adapter = ASHareAdapter()
         self.register_adapter(ashare_adapter)
@@ -67,14 +80,12 @@ class AdapterManager:
 
         self._adapters[adapter.adapter_name] = adapter
 
-        # 按市场分组
+        # 按市场分组并按优先级排序
         for market in adapter.supported_markets:
             if market not in self._market_adapters:
                 self._market_adapters[market] = []
             self._market_adapters[market].append(adapter)
-
-        # 按优先级排序
-        self._market_adapters[market].sort(key=lambda a: a.priority)
+            self._market_adapters[market].sort(key=lambda a: a.priority)
 
     def unregister_adapter(self, adapter_name: str) -> None:
         """
@@ -232,7 +243,7 @@ class AdapterManager:
         """
         return dict(self._adapters)
 
-    def get_adapter_health(self) -> Dict[str, Dict[str, any]]:
+    def get_adapter_health(self) -> Dict[str, Dict[str, Any]]:
         """
         获取所有适配器的健康状态
 

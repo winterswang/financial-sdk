@@ -8,6 +8,7 @@
 """
 
 import importlib
+import os
 import re
 import yaml
 from datetime import datetime, timezone
@@ -46,12 +47,12 @@ YAHOO_HEADERS = {
     "Upgrade-Insecure-Requests": "1",
 }
 
-# SOCKS Proxy configuration
-SOCKS_PROXY_HOST = "127.0.0.1"
-SOCKS_PROXY_PORT = 7890
+# SOCKS Proxy configuration (from environment)
+SOCKS_PROXY_HOST = os.environ.get("SOCKS_PROXY_HOST", "127.0.0.1")
+SOCKS_PROXY_PORT = int(os.environ.get("SOCKS_PROXY_PORT", "7890"))
 
-# Longbridge 配置
-LONGBRIDGE_CONFIG_PATH = "/Users/wangguangchao/code/langchain_financial/longbrige_tools/config.yaml"
+# Longbridge 配置路径 (from environment)
+LONGBRIDGE_CONFIG_PATH = os.environ.get("LONGBRIDGE_CONFIG_PATH", "")
 
 
 def _get_socks_session() -> Any:
@@ -62,6 +63,7 @@ def _get_socks_session() -> Any:
         SOCKSProxyManager 实例
     """
     from urllib3.contrib.socks import SOCKSProxyManager
+
     proxy_url = f"socks5://{SOCKS_PROXY_HOST}:{SOCKS_PROXY_PORT}"
     return SOCKSProxyManager(proxy_url)
 
@@ -346,10 +348,14 @@ class PriceProvider:
             if padding != 4:
                 payload += "=" * padding
             decoded = json.loads(base64.urlsafe_b64decode(payload))
-            expired_at = datetime.fromtimestamp(decoded["exp"], tz=timezone.utc).isoformat()
+            expired_at = datetime.fromtimestamp(
+                decoded["exp"], tz=timezone.utc
+            ).isoformat()
 
             # Call refresh API
-            base_url = config_data.get("http_url", "https://openapi.lbkrs.com").rstrip("/")
+            base_url = config_data.get("http_url", "https://openapi.lbkrs.com").rstrip(
+                "/"
+            )
             url = f"{base_url}/v1/token/refresh"
 
             headers = {"Authorization": token}
@@ -412,7 +418,9 @@ class PriceProvider:
                 stock_code=stock_code,
                 market=market,
                 current_price=float(quote.last_done),
-                currency=str(static_info[0].currency) if hasattr(static_info[0], 'currency') else MARKET_CURRENCY.get(market, "USD"),
+                currency=str(static_info[0].currency)
+                if hasattr(static_info[0], "currency")
+                else MARKET_CURRENCY.get(market, "USD"),
                 price_date=datetime.now().strftime("%Y-%m-%d"),
                 source="longbridge",
             )
@@ -420,7 +428,10 @@ class PriceProvider:
         except Exception as e:
             # 检查是否是认证错误，尝试刷新 token 后重试
             error_msg = str(e)
-            if any(keyword in error_msg.lower() for keyword in ["unauthorized", "401", "403", "token", "auth"]):
+            if any(
+                keyword in error_msg.lower()
+                for keyword in ["unauthorized", "401", "403", "token", "auth"]
+            ):
                 if self._refresh_longbridge_token():
                     # 重新创建 context 并重试
                     ctx = self._get_longbridge_context()
@@ -435,7 +446,9 @@ class PriceProvider:
                                         stock_code=stock_code,
                                         market=market,
                                         current_price=float(quote.last_done),
-                                        currency=str(static_info[0].currency) if hasattr(static_info[0], 'currency') else MARKET_CURRENCY.get(market, "USD"),
+                                        currency=str(static_info[0].currency)
+                                        if hasattr(static_info[0], "currency")
+                                        else MARKET_CURRENCY.get(market, "USD"),
                                         price_date=datetime.now().strftime("%Y-%m-%d"),
                                         source="longbridge",
                                     )
@@ -466,9 +479,7 @@ class PriceProvider:
             return f"{stock_code}.US"
         return None
 
-    def _get_price_with_cache(
-        self, stock_code: str, market: str
-    ) -> PriceResult:
+    def _get_price_with_cache(self, stock_code: str, market: str) -> PriceResult:
         """
         带缓存的价格获取
 
@@ -546,9 +557,7 @@ class PriceProvider:
         except Exception as e:
             return PriceResult(success=False, error=f"获取价格失败: {e}")
 
-    def get_price_batch(
-        self, stock_codes: List[str]
-    ) -> Dict[str, PriceResult]:
+    def get_price_batch(self, stock_codes: List[str]) -> Dict[str, PriceResult]:
         """
         批量获取股票价格
 
