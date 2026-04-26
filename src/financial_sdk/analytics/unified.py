@@ -6,6 +6,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from typing import Any, Dict, List, Optional
 
 from .efficiency import EfficiencyAnalyzer, EfficiencyMetrics
@@ -13,6 +14,8 @@ from .growth import GrowthAnalyzer, GrowthMetrics
 from .profitability import ProfitabilityAnalyzer, ProfitabilityMetrics
 from .safety import SafetyAnalyzer, SafetyMetrics
 from .valuation import ValuationAnalyzer, ValuationMetrics
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -387,41 +390,77 @@ class FinancialAnalytics:
         """
         获取完整财务分析报告
 
+        当某个维度分析失败时，该维度返回 None 但不影响其他维度。
+
         Args:
             stock_code: 股票代码
             period: 报告期类型
 
         Returns:
-            FullAnalysisReport 或 None
+            FullAnalysisReport 或 None (仅当所有维度都失败时返回 None)
         """
+        failed_dims: List[str] = []
+
+        valuation = None
         try:
             valuation = self._valuation.get_valuation_metrics(stock_code, period)
+        except Exception:
+            failed_dims.append("valuation")
+
+        profitability = None
+        try:
             profitability = self._profitability.get_profitability_metrics(
                 stock_code, period
             )
-            efficiency = self._efficiency.get_efficiency_metrics(stock_code, period)
-            growth = self._growth.get_growth_metrics(stock_code, period)
-            safety = self._safety.get_safety_metrics(stock_code, period)
-
-            # 确定报告日期
-            report_date = "N/A"
-            for m in [valuation, profitability, efficiency, growth, safety]:
-                if m and hasattr(m, "report_date"):
-                    report_date = m.report_date
-                    break
-
-            return FullAnalysisReport(
-                stock_code=stock_code,
-                report_date=report_date,
-                valuation=valuation,
-                profitability=profitability,
-                efficiency=efficiency,
-                growth=growth,
-                safety=safety,
-                analysis_timestamp=datetime.now().isoformat(),
-            )
         except Exception:
+            failed_dims.append("profitability")
+
+        efficiency = None
+        try:
+            efficiency = self._efficiency.get_efficiency_metrics(stock_code, period)
+        except Exception:
+            failed_dims.append("efficiency")
+
+        growth = None
+        try:
+            growth = self._growth.get_growth_metrics(stock_code, period)
+        except Exception:
+            failed_dims.append("growth")
+
+        safety = None
+        try:
+            safety = self._safety.get_safety_metrics(stock_code, period)
+        except Exception:
+            failed_dims.append("safety")
+
+        # 所有维度都失败时返回 None
+        if all(m is None for m in [valuation, profitability, efficiency, growth, safety]):
             return None
+
+        # 确定报告日期
+        report_date = "N/A"
+        for m in [valuation, profitability, efficiency, growth, safety]:
+            if m and hasattr(m, "report_date"):
+                report_date = m.report_date
+                break
+
+        report = FullAnalysisReport(
+            stock_code=stock_code,
+            report_date=report_date,
+            valuation=valuation,
+            profitability=profitability,
+            efficiency=efficiency,
+            growth=growth,
+            safety=safety,
+            analysis_timestamp=datetime.now().isoformat(),
+        )
+
+        if failed_dims:
+            logger.warning(
+                f"Stock {stock_code} analysis failed for dimensions: {failed_dims}"
+            )
+
+        return report
 
     def get_multi_year_metrics(
         self,

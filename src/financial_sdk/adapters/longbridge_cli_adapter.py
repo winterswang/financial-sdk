@@ -52,7 +52,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
     # LongBridge 字段名到标准字段名的映射
     # 用于统一不同数据源的字段名
     FIELD_MAPPING = {
-        # 利润表字段
+        # === 利润表字段 ===
         "营业收入(HKD)": "revenue",
         "营业收入(USD)": "revenue",
         "营业收入(CNY)": "revenue",
@@ -65,14 +65,27 @@ class LongbridgeCLIAdapter(BaseAdapter):
         "营业利润(HKD)": "operating_profit",
         "营业利润(USD)": "operating_profit",
         "营业利润(CNY)": "operating_profit",
+        "利润总额(HKD)": "profit_before_tax",
+        "利润总额(USD)": "profit_before_tax",
+        "利润总额(CNY)": "profit_before_tax",
         "毛利率": "gross_margin",
         "净利率": "net_margin",
         "ROE": "roe",
+        "ROA": "roa",
         "每股收益(HKD)": "eps",
         "每股收益(USD)": "eps",
         "每股收益(CNY)": "eps",
         "营业利润/经营现金流": "operating_profit_to_operating_cash_flow",
-        # 资产负债表字段
+        "利息费用(HKD)": "interest_expense",
+        "利息费用(USD)": "interest_expense",
+        "利息费用(CNY)": "interest_expense",
+        "税费(HKD)": "tax_expense",
+        "税费(USD)": "tax_expense",
+        "税费(CNY)": "tax_expense",
+        "折旧与摊销(HKD)": "depreciation_amortization",
+        "折旧与摊销(USD)": "depreciation_amortization",
+        "折旧与摊销(CNY)": "depreciation_amortization",
+        # === 资产负债表字段 ===
         "总资产(HKD)": "total_assets",
         "总资产(USD)": "total_assets",
         "总资产(CNY)": "total_assets",
@@ -83,20 +96,86 @@ class LongbridgeCLIAdapter(BaseAdapter):
         "总权益(USD)": "total_equity",
         "总权益(CNY)": "total_equity",
         "流动资产(HKD)": "current_assets",
+        "流动资产(USD)": "current_assets",
+        "流动资产(CNY)": "current_assets",
         "流动负债(HKD)": "current_liabilities",
+        "流动负债(USD)": "current_liabilities",
+        "流动负债(CNY)": "current_liabilities",
+        "非流动资产(HKD)": "non_current_assets",
+        "非流动资产(USD)": "non_current_assets",
+        "非流动资产(CNY)": "non_current_assets",
+        "非流动负债(HKD)": "non_current_liabilities",
+        "非流动负债(USD)": "non_current_liabilities",
+        "非流动负债(CNY)": "non_current_liabilities",
         "现金及等价物(HKD)": "cash_and_equivalents",
         "现金及等价物(USD)": "cash_and_equivalents",
         "现金及等价物(CNY)": "cash_and_equivalents",
+        "短期投资(HKD)": "short_term_investments",
+        "短期投资(USD)": "short_term_investments",
+        "短期投资(CNY)": "short_term_investments",
         "应收账款(HKD)": "accounts_receivable",
+        "应收账款(USD)": "accounts_receivable",
+        "应收账款(CNY)": "accounts_receivable",
         "应付账款(HKD)": "accounts_payable",
+        "应付账款(USD)": "accounts_payable",
+        "应付账款(CNY)": "accounts_payable",
         "存货(HKD)": "inventory",
-        # 现金流量表字段
+        "存货(USD)": "inventory",
+        "存货(CNY)": "inventory",
+        "固定资产净值(HKD)": "fixed_assets",
+        "固定资产净值(USD)": "fixed_assets",
+        "固定资产净值(CNY)": "fixed_assets",
+        "无形资产(HKD)": "intangible_assets",
+        "无形资产(USD)": "intangible_assets",
+        "无形资产(CNY)": "intangible_assets",
+        "商誉(HKD)": "goodwill",
+        "商誉(USD)": "goodwill",
+        "商誉(CNY)": "goodwill",
+        "长期投资(HKD)": "long_term_equity_investments",
+        "长期投资(USD)": "long_term_equity_investments",
+        "长期投资(CNY)": "long_term_equity_investments",
+        "净债务(HKD)": "net_debt",
+        "净债务(USD)": "net_debt",
+        "净债务(CNY)": "net_debt",
+        "短期债务(HKD)": "short_term_debt",
+        "短期债务(USD)": "short_term_debt",
+        "短期债务(CNY)": "short_term_debt",
+        "长期债务(HKD)": "long_term_debt",
+        "长期债务(USD)": "long_term_debt",
+        "长期债务(CNY)": "long_term_debt",
+        "每股净资产(HKD)": "bvps",
+        "每股净资产(USD)": "bvps",
+        "每股净资产(CNY)": "bvps",
+        "股本(HKD)": "share_capital",
+        "股本(USD)": "share_capital",
+        "股本(CNY)": "share_capital",
+        "留存收益(HKD)": "retained_earnings",
+        "留存收益(USD)": "retained_earnings",
+        "留存收益(CNY)": "retained_earnings",
+        "资本支出(HKD)": "capex",
+        "资本支出(USD)": "capex",
+        "资本支出(CNY)": "capex",
+        # === 现金流量表字段 ===
         "经营现金流(HKD)": "operating_cash_flow",
         "投资现金流(HKD)": "investing_cash_flow",
         "融资现金流(HKD)": "financing_cash_flow",
         "经营现金流(USD)": "operating_cash_flow",
         "投资现金流(USD)": "investing_cash_flow",
         "融资现金流(USD)": "financing_cash_flow",
+        "经营现金流(CNY)": "operating_cash_flow",
+        "投资现金流(CNY)": "investing_cash_flow",
+        "融资现金流(CNY)": "financing_cash_flow",
+    }
+
+    # "及占比"后缀字段映射: 原始名 → 标准绝对值字段名
+    # 这些字段在 LongBridge 中格式为 "XXX(HKD)及占比"，拆分为绝对值和占比
+    RATIO_SUFFIX_FIELDS = {
+        "固定资产净值": "fixed_assets",
+        "存货": "inventory",
+        "应收": "accounts_receivable",
+        "现金及短期投资": "cash_and_equivalents",
+        "长期投资": "long_term_equity_investments",
+        "净债务": "net_debt",
     }
 
     def __init__(self, cli_path: str = "longbridge") -> None:
@@ -137,6 +216,46 @@ class LongbridgeCLIAdapter(BaseAdapter):
             return f"{stock_code}.US"
 
         return stock_code
+
+    def _map_field_name(self, raw_name: str) -> str:
+        """
+        将 LongBridge 原始字段名映射为标准字段名
+
+        处理策略:
+        1. 精确匹配 FIELD_MAPPING
+        2. "及占比"后缀字段: 拆分为绝对值和占比两个字段
+        3. 尝试去掉货币后缀再匹配
+
+        Args:
+            raw_name: LongBridge 返回的原始字段名
+
+        Returns:
+            标准字段名
+        """
+        # 1. 精确匹配
+        if raw_name in self.FIELD_MAPPING:
+            return self.FIELD_MAPPING[raw_name]
+
+        # 2. 处理 "及占比" 后缀: "固定资产净值(HKD)及占比" → "fixed_assets"
+        if raw_name.endswith("及占比"):
+            base = raw_name[:-3]  # 去掉 "及占比"
+            # 去掉货币后缀
+            for suffix in ("(HKD)", "(USD)", "(CNY)"):
+                clean = base.replace(suffix, "")
+                if clean in self.RATIO_SUFFIX_FIELDS:
+                    return self.RATIO_SUFFIX_FIELDS[clean]
+            # 回退: 尝试直接映射 base
+            if base in self.FIELD_MAPPING:
+                return self.FIELD_MAPPING[base]
+
+        # 3. 去掉货币后缀再匹配
+        for suffix in ("(HKD)", "(USD)", "(CNY)"):
+            stripped = raw_name.replace(suffix, "")
+            if stripped in self.FIELD_MAPPING:
+                return self.FIELD_MAPPING[stripped]
+
+        # 4. 未映射，保留原名
+        return raw_name
 
     def _check_cli(self) -> bool:
         """检查 CLI 是否可用"""
@@ -310,6 +429,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                     reason="Longbridge CLI返回空数据",
                     adapter_name=self.adapter_name,
                 )
+            df = self._fill_balance_derived(df)
             return df
         except DataNotAvailableError:
             raise
@@ -359,6 +479,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                     reason="Longbridge CLI返回空数据",
                     adapter_name=self.adapter_name,
                 )
+            df = self._fill_income_derived(df)
             return df
         except DataNotAvailableError:
             raise
@@ -492,7 +613,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 for account in accounts:
                     raw_field_name = account.get("name", "")
                     # 映射到标准字段名
-                    field_name = self.FIELD_MAPPING.get(raw_field_name, raw_field_name)
+                    field_name = self._map_field_name(raw_field_name)
                     values = account.get("values", [])
                     for value_entry in values:
                         record = {
@@ -531,7 +652,70 @@ class LongbridgeCLIAdapter(BaseAdapter):
             index="report_date", columns="field_name", values="value", aggfunc="last"
         )
         df_pivot = df_pivot.reset_index()
+
+        # 数值类型转换: 将字符串值转为 float
+        for col in df_pivot.columns:
+            if col in ("report_date", "_raw_data_source"):
+                continue
+            df_pivot[col] = pd.to_numeric(df_pivot[col], errors="coerce")
+
         return df_pivot
+
+    def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        资产负债表数据自愈: 从已有字段推算缺失的标准字段
+
+        推算规则:
+        - total_equity = total_assets - total_liabilities (缺失时)
+        - bvps = total_equity / share_capital (缺失时)
+
+        Args:
+            df: 宽格式 DataFrame
+
+        Returns:
+            补全后的 DataFrame
+        """
+        if df.empty:
+            return df
+
+        # 推算 total_equity
+        if "total_equity" not in df.columns or df["total_equity"].isna().all():
+            if "total_assets" in df.columns and "total_liabilities" in df.columns:
+                df["total_equity"] = df["total_assets"] - df["total_liabilities"]
+
+        # 推算 bvps = total_equity / share_capital
+        if "bvps" not in df.columns or df["bvps"].isna().all():
+            if (
+                "total_equity" in df.columns
+                and "share_capital" in df.columns
+            ):
+                mask = df["share_capital"].notna() & (df["share_capital"] != 0)
+                df.loc[mask, "bvps"] = df.loc[mask, "total_equity"] / df.loc[mask, "share_capital"]
+
+        return df
+
+    def _fill_income_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        利润表数据自愈: 从已有字段推算缺失的标准字段
+
+        推算规则:
+        - gross_profit = revenue * gross_margin / 100 (缺失时)
+
+        Args:
+            df: 宽格式 DataFrame
+
+        Returns:
+            补全后的 DataFrame
+        """
+        if df.empty:
+            return df
+
+        # 推算 gross_profit
+        if "gross_profit" not in df.columns or df["gross_profit"].isna().all():
+            if "revenue" in df.columns and "gross_margin" in df.columns:
+                df["gross_profit"] = df["revenue"] * df["gross_margin"] / 100
+
+        return df
 
     def _parse_calc_indexes(
         self, data: Dict[str, Any], stock_code: str
