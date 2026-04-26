@@ -165,8 +165,7 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
     store("dps", dps, "HKD/share")
 
     # 获取当前价格
-    current_price = get_value_from_df(pd.DataFrame([{"price": price_result.price.current_price}]) if price_result.success else None, "price") if price_result.success else None
-
+    current_price = None
     if price_result.success and price_result.price:
         current_price = price_result.price.current_price
 
@@ -250,12 +249,11 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
             "unit": "x",
             "note": "PB = 市价 / 每股净资产 (BVPS)",
         }
-    elif current_price is not None and total_equity is not None:
-        # 备选方案：通过总股本反推
-        shares = total_equity / bvps if bvps and bvps > 0 else None
-        if shares and shares > 0:
-            calc_bvps = total_equity / shares
-            calc_pb = current_price / calc_bvps
+    elif current_price is not None and total_equity is not None and total_equity > 0:
+        # 备选方案：通过 BVPS 反推股本再计算
+        if bvps is not None and bvps > 0:
+            shares = total_equity / bvps
+            calc_pb = current_price / bvps
             metrics["pb_ratio"] = {
                 "formula": f"{current_price:.2f} / (总权益/股本)",
                 "numerator": current_price,
@@ -267,8 +265,11 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
             }
 
     # EV = 市值 + 总债务 - 现金
-    if current_price is not None and total_equity is not None:
-        shares = total_equity  # 简化估算股本
+    # 总股本 = 总权益 / 每股净资产
+    shares = None
+    if total_equity is not None and bvps is not None and bvps > 0:
+        shares = total_equity / bvps
+    if current_price is not None and shares is not None and shares > 0:
         market_cap = current_price * shares
         enterprise_value = market_cap + (total_liabilities or 0) - (cash_and_equivalents or 0)
         metrics["enterprise_value"] = {

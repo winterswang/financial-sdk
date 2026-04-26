@@ -247,6 +247,32 @@ class ASHareAdapter(BaseAdapter):
                 adapter_name=self.adapter_name,
             )
 
+    def _filter_by_period(self, df: pd.DataFrame, period: str) -> pd.DataFrame:
+        """
+        按报告期类型过滤 DataFrame
+
+        AkShare 返回年报+季报数据，根据 period 参数过滤。
+        年度报告日期通常以 12-31 或 1231 结尾。
+
+        Args:
+            df: 原始 DataFrame（含 REPORT_DATE 列）
+            period: "annual" 或 "quarterly"
+
+        Returns:
+            过滤后的 DataFrame
+        """
+        if df.empty or "REPORT_DATE" not in df.columns:
+            return df
+
+        date_str = df["REPORT_DATE"].astype(str)
+        is_annual = date_str.str.contains(
+            r"(1231|12-31|12/31)\s*(00:00:00)?$", regex=True
+        )
+        if period == "annual":
+            return df[is_annual]
+        else:
+            return df[~is_annual]
+
     def get_balance_sheet(
         self, stock_code: str, period: str = "annual"
     ) -> pd.DataFrame:
@@ -273,6 +299,15 @@ class ASHareAdapter(BaseAdapter):
                 symbol=self._extract_stock_code(stock_code)
             )
             self._validate_not_empty(df, stock_code, "balance_sheet")
+            # 按 period 过滤: 年度=12月31日, 季度=其他
+            df = self._filter_by_period(df, period)
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="balance_sheet",
+                    reason=f"AkShare无{period}数据",
+                    adapter_name=self.adapter_name,
+                )
             df = self._map_fields(df, "balance_sheet")
             df = self._standardize_date_column(df, "report_date")
             return df
@@ -307,11 +342,19 @@ class ASHareAdapter(BaseAdapter):
         akshare = self._get_akshare()
 
         try:
-            # AkShare的利润表接口 (与资产负债表相同接口)
+            # AkShare的利润表接口
             df = akshare.stock_profit_sheet_by_report_em(
                 symbol=self._extract_stock_code(stock_code)
             )
             self._validate_not_empty(df, stock_code, "income_statement")
+            df = self._filter_by_period(df, period)
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="income_statement",
+                    reason=f"AkShare无{period}数据",
+                    adapter_name=self.adapter_name,
+                )
             df = self._map_fields(df, "income_statement")
             df = self._standardize_date_column(df, "report_date")
             return df
@@ -349,6 +392,14 @@ class ASHareAdapter(BaseAdapter):
                 symbol=self._extract_stock_code(stock_code)
             )
             self._validate_not_empty(df, stock_code, "cash_flow")
+            df = self._filter_by_period(df, period)
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="cash_flow",
+                    reason=f"AkShare无{period}数据",
+                    adapter_name=self.adapter_name,
+                )
             df = self._map_fields(df, "cash_flow")
             df = self._standardize_date_column(df, "report_date")
             return df
@@ -382,10 +433,11 @@ class ASHareAdapter(BaseAdapter):
 
         try:
             # 使用 stock_financial_abstract 接口获取财务指标
+            # stock_financial_abstract 需要6位纯数字代码（如 "600000"）
+            code, market = stock_code.split(".")
             df = akshare.stock_financial_abstract(
-                symbol=self._extract_stock_code(stock_code)
-                .replace("SH", "")
-                .replace("SZ", "")
+                symbol=code,
+                indicator="按报告期" if period == "quarterly" else "按年度",
             )
             self._validate_not_empty(df, stock_code, "indicators")
 

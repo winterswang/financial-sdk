@@ -23,7 +23,7 @@ from .price_models import PriceData, PriceResult
 # 市场股票代码正则
 A_STOCK_PATTERN = re.compile(r"^\d{6}\.(SH|SZ)$")
 HK_STOCK_PATTERN = re.compile(r"^\d{4,5}\.HK$")
-US_STOCK_PATTERN = re.compile(r"^[A-Z]{1,5}$")
+US_STOCK_PATTERN = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 
 # 市场到货币的映射
 MARKET_CURRENCY = {

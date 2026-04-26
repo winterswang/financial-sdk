@@ -26,8 +26,8 @@ class USAdapter(BaseAdapter):
     - MSFT (微软)
     """
 
-    # 美股股票代码正则: 1-5个大写字母
-    STOCK_CODE_PATTERN = re.compile(r"^[A-Z]{1,5}$")
+    # 美股股票代码正则: 1-5个大写字母，支持 BRK.B 格式
+    STOCK_CODE_PATTERN = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 
     def __init__(self, config_path: Optional[str] = None) -> None:
         """

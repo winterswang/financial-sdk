@@ -5,6 +5,7 @@
 """
 
 from pathlib import Path
+from threading import Lock
 from typing import Any, Dict, Optional
 
 import yaml
@@ -118,17 +119,21 @@ class Config:
 
 # 全局配置实例
 _global_config: Optional[Config] = None
+_config_lock = Lock()
 
 
 def get_config() -> Config:
-    """获取全局配置实例"""
+    """获取全局配置实例（线程安全）"""
     global _global_config
     if _global_config is None:
-        _global_config = Config()
+        with _config_lock:
+            if _global_config is None:
+                _global_config = Config()
     return _global_config
 
 
 def set_config(config: Config) -> None:
     """设置全局配置实例"""
     global _global_config
-    _global_config = config
+    with _config_lock:
+        _global_config = config

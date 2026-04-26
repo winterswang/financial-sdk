@@ -10,6 +10,8 @@ Usage:
 """
 
 import json
+import math
+import re
 import asyncio
 from typing import Any
 
@@ -18,6 +20,18 @@ from mcp.server.stdio import stdio_server
 from mcp.types import Tool, CallToolResult, TextContent
 
 from financial_sdk import FinancialFacade, NoAdapterAvailableError
+
+
+# 股票代码格式校验
+STOCK_CODE_PATTERN = re.compile(r"^(\d{6}\.(SH|SZ)|\d{4,5}\.HK|[A-Z]{1,5}(\.[A-Z])?)$")
+
+
+def _sanitize_value(val: Any) -> Any:
+    """将 NaN/Inf 替换为 None，确保 JSON 可序列化"""
+    if isinstance(val, float):
+        if math.isnan(val) or math.isinf(val):
+            return None
+    return val
 
 
 server = Server("financial-sdk")
@@ -37,9 +51,12 @@ def _bundle_to_dict(bundle) -> dict:
     for report_name in ["balance_sheet", "income_statement", "cash_flow", "indicators"]:
         df = getattr(bundle, report_name, None)
         if df is not None and not df.empty:
+            data_rows = []
+            for row in df.head(10).values.tolist():
+                data_rows.append([_sanitize_value(v) for v in row])
             result[report_name] = {
                 "columns": list(df.columns),
-                "data": df.head(10).values.tolist(),
+                "data": data_rows,
                 "row_count": len(df),
             }
     return result
@@ -92,6 +109,8 @@ async def call_tool(name: str, arguments: Any) -> CallToolResult:
             stock_code = arguments.get("stock_code")
             if not stock_code:
                 return CallToolResult(content=[TextContent(type="text", text="Error: stock_code is required")], isError=True)
+            if not isinstance(stock_code, str) or len(stock_code) > 20 or not STOCK_CODE_PATTERN.match(stock_code):
+                return CallToolResult(content=[TextContent(type="text", text=f"Error: invalid stock_code format: {stock_code}")], isError=True)
             try:
                 bundle = facade.get_financial_data(
                     stock_code=stock_code,

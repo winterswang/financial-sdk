@@ -89,6 +89,10 @@ class MetricsCalculator:
 
         Returns:
             PEG比率或 None
+
+        Note:
+            PEG = PE / (增长率百分比)
+            growth_rate=0.2 表示20%增长，PEG = PE / (0.2 * 100) = PE / 20
         """
         if pe_ratio is None or growth_rate is None or growth_rate == 0:
             return None

@@ -302,10 +302,24 @@ class LongbridgeCLIAdapter(BaseAdapter):
                     "json",
                 ]
             )
-            return self._parse_financial_report(data, "balance_sheet")
+            df = self._parse_financial_report(data, "balance_sheet")
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="balance_sheet",
+                    reason="Longbridge CLI返回空数据",
+                    adapter_name=self.adapter_name,
+                )
+            return df
+        except DataNotAvailableError:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to get balance sheet for {stock_code}: {e}")
-            return pd.DataFrame()
+            raise DataNotAvailableError(
+                stock_code=stock_code,
+                report_type="balance_sheet",
+                reason=str(e),
+                adapter_name=self.adapter_name,
+            )
 
     def get_income_statement(
         self, stock_code: str, period: str = "annual"
@@ -337,10 +351,24 @@ class LongbridgeCLIAdapter(BaseAdapter):
                     "json",
                 ]
             )
-            return self._parse_financial_report(data, "income_statement")
+            df = self._parse_financial_report(data, "income_statement")
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="income_statement",
+                    reason="Longbridge CLI返回空数据",
+                    adapter_name=self.adapter_name,
+                )
+            return df
+        except DataNotAvailableError:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to get income statement for {stock_code}: {e}")
-            return pd.DataFrame()
+            raise DataNotAvailableError(
+                stock_code=stock_code,
+                report_type="income_statement",
+                reason=str(e),
+                adapter_name=self.adapter_name,
+            )
 
     def get_cash_flow(self, stock_code: str, period: str = "annual") -> pd.DataFrame:
         """
@@ -370,10 +398,24 @@ class LongbridgeCLIAdapter(BaseAdapter):
                     "json",
                 ]
             )
-            return self._parse_financial_report(data, "cash_flow")
+            df = self._parse_financial_report(data, "cash_flow")
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="cash_flow",
+                    reason="Longbridge CLI返回空数据",
+                    adapter_name=self.adapter_name,
+                )
+            return df
+        except DataNotAvailableError:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to get cash flow for {stock_code}: {e}")
-            return pd.DataFrame()
+            raise DataNotAvailableError(
+                stock_code=stock_code,
+                report_type="cash_flow",
+                reason=str(e),
+                adapter_name=self.adapter_name,
+            )
 
     def get_indicators(self, stock_code: str, period: str = "annual") -> pd.DataFrame:
         """
@@ -402,10 +444,24 @@ class LongbridgeCLIAdapter(BaseAdapter):
                     "json",
                 ]
             )
-            return self._parse_calc_indexes(data, stock_code)
+            df = self._parse_calc_indexes(data, stock_code)
+            if df.empty:
+                raise DataNotAvailableError(
+                    stock_code=stock_code,
+                    report_type="indicators",
+                    reason="Longbridge CLI返回空数据",
+                    adapter_name=self.adapter_name,
+                )
+            return df
+        except DataNotAvailableError:
+            raise
         except Exception as e:
-            logger.warning(f"Failed to get indicators for {stock_code}: {e}")
-            return pd.DataFrame()
+            raise DataNotAvailableError(
+                stock_code=stock_code,
+                report_type="indicators",
+                reason=str(e),
+                adapter_name=self.adapter_name,
+            )
 
     def _parse_financial_report(
         self, data: Dict[str, Any], report_type: str

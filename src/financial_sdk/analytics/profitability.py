@@ -8,11 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-import pandas as pd
-
 from .analytics_base import BaseAnalyzer
-from ..facade import FinancialFacade
-from .metrics_calculator import MetricsCalculator
 
 
 @dataclass
@@ -151,58 +147,18 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
         print(f"ROE: {dupont['roe']}")
     """
 
-    def __init__(self, financial_facade: Optional[FinancialFacade] = None) -> None:
+    def __init__(self, financial_facade: Optional["FinancialFacade"] = None) -> None:
         """
         初始化盈利能力分析器
 
         Args:
             financial_facade: 财务门面实例
         """
-        self._facade = financial_facade or FinancialFacade()
-        self._calculator = MetricsCalculator()
+        super().__init__(financial_facade=financial_facade)
 
     @property
     def analyzer_name(self) -> str:
         return "profitability_analyzer"
-
-    def _get_financial_data(
-        self, stock_code: str, period: str = "annual"
-    ) -> Dict[str, Optional[pd.DataFrame]]:
-        """获取财务报表数据"""
-        try:
-            bundle = self._facade.get_financial_data(
-                stock_code=stock_code,
-                report_type="all",
-                period=period,
-            )
-            return {
-                "income_statement": bundle.income_statement,
-                "balance_sheet": bundle.balance_sheet,
-                "cash_flow": bundle.cash_flow,
-                "indicators": bundle.indicators,
-            }
-        except Exception:
-            return {
-                "income_statement": None,
-                "balance_sheet": None,
-                "cash_flow": None,
-                "indicators": None,
-            }
-
-    def _get_value(self, df: Optional[pd.DataFrame], field: str) -> Optional[float]:
-        """从 DataFrame 获取最新值"""
-        return self._calculator.get_latest_value(df, field)
-
-    def _get_latest_report_date(self, df: Optional[pd.DataFrame]) -> str:
-        """获取最新报告日期"""
-        if df is None or df.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        if "report_date" not in df.columns:
-            return datetime.now().strftime("%Y-%m-%d")
-        dates = df["report_date"].dropna()
-        if dates.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        return str(dates.iloc[-1])
 
     def get_profitability_metrics(
         self, stock_code: str, period: str = "annual"
@@ -253,10 +209,11 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
         if operating_profit is not None:
             tax_rate = 0.25  # 默认税率
             if net_profit is not None and revenue is not None and revenue > 0:
-                # 估算税率
+                # 估算税率: 税率 = 税费 / 税前利润
                 tax_expense = self._get_value(income, "tax_expense")
-                if tax_expense and operating_profit > 0:
-                    tax_rate = min(tax_expense / operating_profit, 0.30)
+                profit_before_tax = self._get_value(income, "profit_before_tax")
+                if tax_expense and profit_before_tax and profit_before_tax > 0:
+                    tax_rate = min(tax_expense / profit_before_tax, 0.50)
 
             total_liabilities = self._get_value(balance, "total_liabilities")
             cash = self._get_value(balance, "cash_and_equivalents")
@@ -468,15 +425,6 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
 
     def health_check(self) -> Dict[str, Any]:
         """健康检查"""
-        facade_healthy = True
-
-        try:
-            FinancialFacade().health_check()
-        except Exception:
-            facade_healthy = False
-
-        return {
-            "name": self.analyzer_name,
-            "status": "healthy" if facade_healthy else "degraded",
-            "facade_available": facade_healthy,
-        }
+        result = super().health_check()
+        result["facade_available"] = result["status"] == "healthy"
+        return result

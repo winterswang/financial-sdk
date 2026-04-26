@@ -8,12 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-import pandas as pd
-
 from .analytics_base import BaseAnalyzer
-from ..facade import FinancialFacade
 from ..price import PriceProvider, get_price_provider
-from .metrics_calculator import MetricsCalculator
 
 
 @dataclass
@@ -141,7 +137,7 @@ class SafetyAnalyzer(BaseAnalyzer):
 
     def __init__(
         self,
-        financial_facade: Optional[FinancialFacade] = None,
+        financial_facade: Optional["FinancialFacade"] = None,
         price_provider: Optional[PriceProvider] = None,
     ) -> None:
         """
@@ -151,52 +147,12 @@ class SafetyAnalyzer(BaseAnalyzer):
             financial_facade: 财务门面实例
             price_provider: 价格提供者实例
         """
-        self._facade = financial_facade or FinancialFacade()
+        super().__init__(financial_facade=financial_facade)
         self._price_provider = price_provider or get_price_provider()
-        self._calculator = MetricsCalculator()
 
     @property
     def analyzer_name(self) -> str:
         return "safety_analyzer"
-
-    def _get_financial_data(
-        self, stock_code: str, period: str = "annual"
-    ) -> Dict[str, Optional[pd.DataFrame]]:
-        """获取财务报表数据"""
-        try:
-            bundle = self._facade.get_financial_data(
-                stock_code=stock_code,
-                report_type="all",
-                period=period,
-            )
-            return {
-                "income_statement": bundle.income_statement,
-                "balance_sheet": bundle.balance_sheet,
-                "cash_flow": bundle.cash_flow,
-                "indicators": bundle.indicators,
-            }
-        except Exception:
-            return {
-                "income_statement": None,
-                "balance_sheet": None,
-                "cash_flow": None,
-                "indicators": None,
-            }
-
-    def _get_value(self, df: Optional[pd.DataFrame], field: str) -> Optional[float]:
-        """从 DataFrame 获取最新值"""
-        return self._calculator.get_latest_value(df, field)
-
-    def _get_latest_report_date(self, df: Optional[pd.DataFrame]) -> str:
-        """获取最新报告日期"""
-        if df is None or df.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        if "report_date" not in df.columns:
-            return datetime.now().strftime("%Y-%m-%d")
-        dates = df["report_date"].dropna()
-        if dates.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        return str(dates.iloc[-1])
 
     def get_safety_metrics(
         self, stock_code: str, period: str = "annual"
@@ -214,6 +170,7 @@ class SafetyAnalyzer(BaseAnalyzer):
         fs_data = self._get_financial_data(stock_code, period)
         income = fs_data["income_statement"]
         balance = fs_data["balance_sheet"]
+        indicators = fs_data["indicators"]
 
         if balance is None or balance.empty:
             return None
@@ -275,25 +232,22 @@ class SafetyAnalyzer(BaseAnalyzer):
         )
 
         # 计算 Altman Z-Score
-        # 需要市值
+        # 需要市值: 市值 = 股价 × 总股本，总股本 = 总权益 / 每股净资产
         market_cap = None
         price_result = self._price_provider.get_price(stock_code)
         if price_result.success and price_result.price:
-            # 市值 = 股价 × 估算股本
             current_price = price_result.price.current_price
-            if total_equity and current_price and current_price > 0:
-                # 估算股本
-                shares = total_equity / (
-                    self._get_value(balance, "total_equity") / total_equity
-                    if total_equity > 0
-                    else 1
-                )
-                if shares and shares > 0:
+            if current_price and current_price > 0:
+                bvps = self._get_value(indicators, "bvps") if indicators is not None else None
+                if total_equity and bvps and bvps > 0:
+                    shares = total_equity / bvps
                     market_cap = current_price * shares
 
-        # 留存收益 (简化: 使用净利润累加的近似)
-        # 实际应该用利润表中的分配后利润
-        retained_earnings = net_profit  # 简化处理
+        # 留存收益: 优先使用资产负债表中的未分配利润字段
+        retained_earnings = self._get_value(balance, "retained_earnings")
+        if retained_earnings is None:
+            # 回退: 使用当期净利润作为近似（会低估成熟公司的累计留存收益）
+            retained_earnings = net_profit
 
         # EBIT (使用营业利润作为近似)
         ebit = operating_profit
@@ -461,9 +415,11 @@ class SafetyAnalyzer(BaseAnalyzer):
                 operating_profit, interest_expense
             )
 
-            # 留存收益
+            # 留存收益: 优先使用资产负债表中的未分配利润
             net_profit = self._get_value(income, "net_profit")
-            retained_earnings = net_profit  # 简化处理
+            retained_earnings = self._get_value(balance, "retained_earnings")
+            if retained_earnings is None:
+                retained_earnings = net_profit
 
             # Altman Z-Score (不需要市值，使用总资产代替)
             altman_z_score = None
@@ -513,25 +469,16 @@ class SafetyAnalyzer(BaseAnalyzer):
 
     def health_check(self) -> Dict[str, Any]:
         """健康检查"""
-        facade_healthy = True
+        result = super().health_check()
         price_healthy = True
-
         try:
-            FinancialFacade().health_check()
-        except Exception:
-            facade_healthy = False
-
-        try:
-            from ..price import get_price_provider
-
-            provider = get_price_provider()
-            provider.get_price("600000.SH")
+            self._price_provider.get_price("600000.SH")
         except Exception:
             price_healthy = False
 
-        return {
-            "name": self.analyzer_name,
-            "status": "healthy" if (facade_healthy and price_healthy) else "degraded",
-            "facade_available": facade_healthy,
-            "price_provider_available": price_healthy,
-        }
+        facade_healthy = result["status"] == "healthy"
+        result["status"] = "healthy" if (facade_healthy and price_healthy) else "degraded"
+        result["facade_available"] = facade_healthy
+        result["price_provider_available"] = price_healthy
+        result.pop("supported_markets", None)
+        return result

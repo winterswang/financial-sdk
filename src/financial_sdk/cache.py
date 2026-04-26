@@ -7,6 +7,7 @@
 
 from dataclasses import dataclass
 from datetime import datetime
+from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from cachetools import LRUCache
@@ -143,9 +144,8 @@ class FinancialCache:
         """
         # 如果缓存已满，触发LRU淘汰
         if len(self._cache) >= self._max_size and key not in self._cache:
-            # 移除最旧的条目
-            oldest_key = next(iter(self._cache))
-            del self._cache[oldest_key]
+            # 使用 popitem() 移除最近最少使用的条目
+            self._cache.popitem()
             self._stats.evictions += 1
 
         entry = CacheEntry(value=value, created_at=datetime.now(), ttl_seconds=ttl)
@@ -212,25 +212,32 @@ class FinancialCache:
         return len(self._cache)
 
     def __contains__(self, key: str) -> bool:
-        return key in self._cache and not self._cache[key].is_expired
+        entry = self._cache.get(key)
+        if entry is None:
+            return False
+        return not entry.is_expired
 
 
 # 全局缓存实例
 _global_cache: Optional[FinancialCache] = None
+_cache_lock = Lock()
 
 
 def get_cache() -> FinancialCache:
-    """获取全局缓存实例"""
+    """获取全局缓存实例（线程安全）"""
     global _global_cache
     if _global_cache is None:
-        _global_cache = FinancialCache()
+        with _cache_lock:
+            if _global_cache is None:
+                _global_cache = FinancialCache()
     return _global_cache
 
 
 def set_cache(cache: FinancialCache) -> None:
     """设置全局缓存实例"""
     global _global_cache
-    _global_cache = cache
+    with _cache_lock:
+        _global_cache = cache
 
 
 def clear_cache() -> None:

@@ -8,12 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-import pandas as pd
-
 from .analytics_base import BaseAnalyzer
-from ..facade import FinancialFacade
 from ..price import PriceProvider, get_price_provider
-from .metrics_calculator import MetricsCalculator
 
 
 @dataclass
@@ -127,7 +123,7 @@ class ValuationAnalyzer(BaseAnalyzer):
     def __init__(
         self,
         price_provider: Optional[PriceProvider] = None,
-        financial_facade: Optional[FinancialFacade] = None,
+        financial_facade: Optional["FinancialFacade"] = None,
     ) -> None:
         """
         初始化估值分析器
@@ -136,85 +132,12 @@ class ValuationAnalyzer(BaseAnalyzer):
             price_provider: 价格提供者实例
             financial_facade: 财务门面实例
         """
+        super().__init__(financial_facade=financial_facade)
         self._price_provider = price_provider or get_price_provider()
-        self._facade = financial_facade or FinancialFacade()
-        self._calculator = MetricsCalculator()
 
     @property
     def analyzer_name(self) -> str:
         return "valuation_analyzer"
-
-    def _get_financial_data(
-        self, stock_code: str, period: str = "annual"
-    ) -> Dict[str, pd.DataFrame]:
-        """
-        获取财务报表数据
-
-        Returns:
-            Dict[str, DataFrame]: 包含各报表的字典
-        """
-        try:
-            bundle = self._facade.get_financial_data(
-                stock_code=stock_code,
-                report_type="all",
-                period=period,
-            )
-            return {
-                "income_statement": bundle.income_statement,
-                "balance_sheet": bundle.balance_sheet,
-                "cash_flow": bundle.cash_flow,
-                "indicators": bundle.indicators,
-            }
-        except Exception:
-            return {
-                "income_statement": None,
-                "balance_sheet": None,
-                "cash_flow": None,
-                "indicators": None,
-            }
-
-    def _get_value(
-        self, df: Optional[pd.DataFrame], field: str, period_index: int = 0
-    ) -> Optional[float]:
-        """
-        从 DataFrame 获取指定字段的最新值
-
-        Args:
-            df: DataFrame
-            field: 字段名
-            period_index: 取第几期 (0=最新)
-
-        Returns:
-            值或 None
-        """
-        if df is None or df.empty:
-            return None
-        if field not in df.columns or "report_date" not in df.columns:
-            return None
-
-        # 按日期排序确保获取正确的数据
-        df_sorted = df.sort_values("report_date", ascending=True)
-
-        values = df_sorted[field].dropna()
-        if values.empty:
-            return None
-
-        if period_index < len(values):
-            return float(values.iloc[-(period_index + 1)])  # 最后一行是最新的
-        return float(values.iloc[0])
-
-    def _get_latest_report_date(self, df: Optional[pd.DataFrame]) -> str:
-        """获取最新报告日期"""
-        if df is None or df.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        if "report_date" not in df.columns:
-            return datetime.now().strftime("%Y-%m-%d")
-
-        dates = df["report_date"].dropna()
-        if dates.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-
-        return str(dates.iloc[-1])
 
     def get_valuation_metrics(
         self, stock_code: str, period: str = "annual"
@@ -257,22 +180,18 @@ class ValuationAnalyzer(BaseAnalyzer):
         cash = self._get_value(balance, "cash_and_equivalents")
         depreciation = self._get_value(cash_flow, "depreciation_amortization")
 
-        # 计算总股本 (总市值/价格 或 总权益/每股净资产)
+        # 计算总股本: 总股本 = 总权益 / 每股净资产
         shares = None
         if total_equity and bvps and bvps > 0:
             shares = total_equity / bvps
-        elif total_assets and total_equity:
-            shares = total_assets  # 简化估算
 
         # 计算市值
         market_cap = None
         if shares and shares > 0:
             market_cap = current_price * shares
 
-        # 计算股息 (简化)
-        dps = self._get_value(indicators, "dps") or self._get_value(
-            income, "dividends_paid"
-        )
+        # 计算每股股息: 优先使用指标表的每股股息，不使用分红总额
+        dps = self._get_value(indicators, "dps")
 
         # 计算 EBITDA
         ebitda = None
@@ -434,24 +353,18 @@ class ValuationAnalyzer(BaseAnalyzer):
 
     def health_check(self) -> Dict[str, Any]:
         """健康检查"""
+        result = super().health_check()
         price_healthy = True
-        facade_healthy = True
-
         try:
             self._price_provider.get_price("600000.SH")
         except Exception:
             price_healthy = False
 
-        try:
-            FinancialFacade().health_check()
-        except Exception:
-            facade_healthy = False
-
-        return {
-            "name": self.analyzer_name,
-            "status": "healthy" if (price_healthy and facade_healthy) else "degraded",
-            "components": {
-                "price_provider": "healthy" if price_healthy else "unhealthy",
-                "financial_facade": "healthy" if facade_healthy else "unhealthy",
-            },
+        facade_healthy = result["status"] == "healthy"
+        result["status"] = "healthy" if (facade_healthy and price_healthy) else "degraded"
+        result["components"] = {
+            "price_provider": "healthy" if price_healthy else "unhealthy",
+            "financial_facade": "healthy" if facade_healthy else "unhealthy",
         }
+        result.pop("supported_markets", None)
+        return result

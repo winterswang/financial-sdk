@@ -11,8 +11,6 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from .analytics_base import BaseAnalyzer
-from ..facade import FinancialFacade
-from .metrics_calculator import MetricsCalculator
 
 
 @dataclass
@@ -138,43 +136,18 @@ class GrowthAnalyzer(BaseAnalyzer):
         revenue_growth = analyzer.get_revenue_growth("600000.SH")
     """
 
-    def __init__(self, financial_facade: Optional[FinancialFacade] = None) -> None:
+    def __init__(self, financial_facade: Optional["FinancialFacade"] = None) -> None:
         """
         初始化成长性分析器
 
         Args:
             financial_facade: 财务门面实例
         """
-        self._facade = financial_facade or FinancialFacade()
-        self._calculator = MetricsCalculator()
+        super().__init__(financial_facade=financial_facade)
 
     @property
     def analyzer_name(self) -> str:
         return "growth_analyzer"
-
-    def _get_financial_data(
-        self, stock_code: str, period: str = "annual"
-    ) -> Dict[str, Optional[pd.DataFrame]]:
-        """获取财务报表数据"""
-        try:
-            bundle = self._facade.get_financial_data(
-                stock_code=stock_code,
-                report_type="all",
-                period=period,
-            )
-            return {
-                "income_statement": bundle.income_statement,
-                "balance_sheet": bundle.balance_sheet,
-                "cash_flow": bundle.cash_flow,
-                "indicators": bundle.indicators,
-            }
-        except Exception:
-            return {
-                "income_statement": None,
-                "balance_sheet": None,
-                "cash_flow": None,
-                "indicators": None,
-            }
 
     def _get_series(
         self, df: Optional[pd.DataFrame], field: str
@@ -205,17 +178,6 @@ class GrowthAnalyzer(BaseAnalyzer):
         if series is None or len(series) < 2:
             return None
         return self._calculator.calculate_yoy_growth(series[-1], series[-2])
-
-    def _get_latest_report_date(self, df: Optional[pd.DataFrame]) -> str:
-        """获取最新报告日期"""
-        if df is None or df.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        if "report_date" not in df.columns:
-            return datetime.now().strftime("%Y-%m-%d")
-        dates = df["report_date"].dropna()
-        if dates.empty:
-            return datetime.now().strftime("%Y-%m-%d")
-        return str(dates.iloc[-1])
 
     def get_growth_metrics(
         self, stock_code: str, period: str = "annual"
@@ -452,15 +414,6 @@ class GrowthAnalyzer(BaseAnalyzer):
 
     def health_check(self) -> Dict[str, Any]:
         """健康检查"""
-        facade_healthy = True
-
-        try:
-            FinancialFacade().health_check()
-        except Exception:
-            facade_healthy = False
-
-        return {
-            "name": self.analyzer_name,
-            "status": "healthy" if facade_healthy else "degraded",
-            "facade_available": facade_healthy,
-        }
+        result = super().health_check()
+        result["facade_available"] = result["status"] == "healthy"
+        return result

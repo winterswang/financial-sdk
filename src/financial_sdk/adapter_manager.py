@@ -5,6 +5,7 @@
 """
 
 import re
+from threading import Lock
 from typing import Any, Dict, List, Optional, Tuple
 
 from .adapters import (
@@ -32,7 +33,7 @@ class AdapterManager:
     # 股票代码市场识别正则
     A_STOCK_PATTERN = re.compile(r"^\d{6}\.(SH|SZ)$")
     HK_STOCK_PATTERN = re.compile(r"^\d{4,5}\.HK$")
-    US_STOCK_PATTERN = re.compile(r"^[A-Z]{1,5}$")
+    US_STOCK_PATTERN = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?$")
 
     def __init__(self) -> None:
         """初始化适配器管理器"""
@@ -271,17 +272,21 @@ class AdapterManager:
 
 # 全局适配器管理器实例
 _global_manager: Optional[AdapterManager] = None
+_manager_lock = Lock()
 
 
 def get_adapter_manager() -> AdapterManager:
-    """获取全局适配器管理器实例"""
+    """获取全局适配器管理器实例（线程安全）"""
     global _global_manager
     if _global_manager is None:
-        _global_manager = AdapterManager()
+        with _manager_lock:
+            if _global_manager is None:
+                _global_manager = AdapterManager()
     return _global_manager
 
 
 def reset_adapter_manager() -> None:
     """重置全局适配器管理器"""
     global _global_manager
-    _global_manager = None
+    with _manager_lock:
+        _global_manager = None
