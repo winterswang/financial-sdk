@@ -34,6 +34,7 @@ class FullAnalysisReport:
     growth: Optional[GrowthMetrics]
     safety: Optional[SafetyMetrics]
     analysis_timestamp: str = ""
+    failed_dimensions: Optional[List[str]] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -175,6 +176,11 @@ class FullAnalysisReport:
                 if v.dividend_yield
                 else "  Dividend Yield: N/A"
             )
+        else:
+            lines.append("\n📊 VALUATION METRICS (估值指标)")
+            lines.append("-" * width)
+            reason = self._get_dimension_reason("valuation")
+            lines.append(f"  ⚠️ 数据不可用: {reason}")
 
         # 盈利能力
         if self.profitability:
@@ -212,6 +218,11 @@ class FullAnalysisReport:
                     if p.dupont_equity_multiplier
                     else "    Equity Multiplier: N/A"
                 )
+        else:
+            lines.append("\n📈 PROFITABILITY (盈利能力)")
+            lines.append("-" * width)
+            reason = self._get_dimension_reason("profitability")
+            lines.append(f"  ⚠️ 数据不可用: {reason}")
 
         # 运营效率
         if self.efficiency:
@@ -231,6 +242,11 @@ class FullAnalysisReport:
             lines.append(f"  DIO: {e.dio:.1f} days" if e.dio else "  DIO: N/A")
             lines.append(f"  DSO: {e.dso:.1f} days" if e.dso else "  DSO: N/A")
             lines.append(f"  DPO: {e.dpo:.1f} days" if e.dpo else "  DPO: N/A")
+        else:
+            lines.append("\n⚡ EFFICIENCY (运营效率)")
+            lines.append("-" * width)
+            reason = self._get_dimension_reason("efficiency")
+            lines.append(f"  ⚠️ 数据不可用: {reason}")
 
         # 成长性
         if self.growth:
@@ -252,6 +268,11 @@ class FullAnalysisReport:
                 if g.sustainable_growth_rate
                 else "  Sustainable Growth: N/A"
             )
+        else:
+            lines.append("\n📈 GROWTH (成长性)")
+            lines.append("-" * width)
+            reason = self._get_dimension_reason("growth")
+            lines.append(f"  ⚠️ 数据不可用: {reason}")
 
         # 财务安全
         if self.safety:
@@ -285,6 +306,11 @@ class FullAnalysisReport:
                 if s.debt_to_equity
                 else "  Debt/Equity: N/A"
             )
+        else:
+            lines.append("\n🛡️ SAFETY (财务安全)")
+            lines.append("-" * width)
+            reason = self._get_dimension_reason("safety")
+            lines.append(f"  ⚠️ 数据不可用: {reason}")
 
         lines.append("\n" + "=" * width)
         return "\n".join(lines)
@@ -302,6 +328,21 @@ class FullAnalysisReport:
             return f"{market_cap / 1e4:.2f}万"
         else:
             return f"{market_cap:.2f}"
+
+    _DIMENSION_REQUIRED_FIELDS = {
+        "valuation": "需要 EPS/价格数据",
+        "profitability": "需要 revenue/net_profit/total_equity 等利润表和资产负债表字段",
+        "efficiency": "需要 inventory/accounts_receivable/accounts_payable 标准字段",
+        "growth": "需要至少2期财务数据做 YoY 计算",
+        "safety": "需要 current_assets/current_liabilities/total_equity 等资产负债表字段",
+    }
+
+    def _get_dimension_reason(self, dimension: str) -> str:
+        """获取维度数据不可用的原因"""
+        reason = self._DIMENSION_REQUIRED_FIELDS.get(dimension, "数据不完整")
+        if self.failed_dimensions and dimension in self.failed_dimensions:
+            return f"分析过程异常 ({reason})"
+        return reason
 
 
 class FinancialAnalytics:
@@ -435,6 +476,9 @@ class FinancialAnalytics:
 
         # 所有维度都失败时返回 None
         if all(m is None for m in [valuation, profitability, efficiency, growth, safety]):
+            logger.warning(
+                f"Stock {stock_code} analysis failed for ALL dimensions: {failed_dims}"
+            )
             return None
 
         # 确定报告日期
@@ -453,6 +497,7 @@ class FinancialAnalytics:
             growth=growth,
             safety=safety,
             analysis_timestamp=datetime.now().isoformat(),
+            failed_dimensions=failed_dims if failed_dims else None,
         )
 
         if failed_dims:

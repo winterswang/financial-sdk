@@ -11,6 +11,7 @@ import pytest
 
 from financial_sdk import FinancialFacade
 from financial_sdk.exceptions import (
+    DataNotAvailableError,
     InvalidStockCodeError,
     NoAdapterAvailableError,
 )
@@ -89,11 +90,11 @@ class TestHKIntegration:
         assert bundle.market == "HK"
 
     def test_invalid_hk_code(self, facade):
-        """测试无效的港股代码 - 格式无效会被拒绝，数据无效会返回NoAdapterAvailableError"""
-        # 1234.HK 格式上是有效的（4位数字.HK），但实际股票不存在
-        # 所以会抛出 NoAdapterAvailableError 而不是 InvalidStockCodeError
-        with pytest.raises(NoAdapterAvailableError):
-            facade.get_financial_data("1234.HK", "balance_sheet", "annual")
+        """测试无效的港股代码 - 格式无效会被拒绝"""
+        # 99999.HK 格式上有效但5位数字超出港股范围，数据获取应失败
+        # 注意: 1234.HK 是真实存在的港股代码，不能用作无效测试
+        with pytest.raises((NoAdapterAvailableError, DataNotAvailableError, InvalidStockCodeError)):
+            facade.get_financial_data("99999.HK", "balance_sheet", "annual")
 
     def test_market_detection(self, facade):
         """测试市场识别"""

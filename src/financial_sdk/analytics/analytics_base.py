@@ -117,7 +117,7 @@ class BaseAnalyzer(ABC):
             return datetime.now().strftime("%Y-%m-%d")
         if "report_date" not in df.columns:
             return datetime.now().strftime("%Y-%m-%d")
-        dates = df["report_date"].dropna()
+        dates = df["report_date"].dropna().sort_values()
         if dates.empty:
             return datetime.now().strftime("%Y-%m-%d")
         return str(dates.iloc[-1])

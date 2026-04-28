@@ -68,35 +68,43 @@ class ASHareAdapter(BaseAdapter):
                     "REPORT_DATE": "report_date",
                     "SECURITY_CODE": "stock_code",
                     "TOTAL_CURRENT_ASSETS": "current_assets",
-                    "TOTAL_NON_CURRENT_ASSETS": "non_current_assets",
+                    "TOTAL_NONCURRENT_ASSETS": "non_current_assets",
                     "TOTAL_ASSETS": "total_assets",
-                    "TOTAL_CURRENT_LIABILITIES": "current_liabilities",
-                    "TOTAL_NON_CURRENT_LIABILITIES": "non_current_liabilities",
+                    "TOTAL_CURRENT_LIAB": "current_liabilities",
+                    "TOTAL_NONCURRENT_LIAB": "non_current_liabilities",
                     "TOTAL_LIABILITIES": "total_liabilities",
                     "TOTAL_EQUITY": "total_equity",
-                    "FIXED_ASSETS": "fixed_assets",
+                    "TOTAL_PARENT_EQUITY": "total_parent_equity",
+                    "FIXED_ASSET": "fixed_assets",
                     "INTANGIBLE_ASSETS": "intangible_assets",
-                    "ACCOUNTS_RECEIVABLE": "accounts_receivable",
-                    "INVENTORIES": "inventory",
+                    "ACCOUNTS_RECE": "accounts_receivable",
+                    "INVENTORY": "inventory",
                     "ACCOUNTS_PAYABLE": "accounts_payable",
-                    "SHORT_TERM_BORROWINGS": "short_term_debt",
-                    "LONG_TERM_BORROWINGS": "long_term_debt",
+                    "SHORT_LOAN": "short_term_debt",
+                    "LONG_LOAN": "long_term_debt",
+                    "MONETARYFUNDS": "cash_and_equivalents",
+                    "SURPLUS_RESERVE": "surplus_reserve",
+                    "CAPITAL_RESERVE": "capital_reserve",
+                    "SPECIAL_RESERVE": "special_reserve",
+                    "MINORITY_EQUITY": "minority_interest",
                 },
                 "income_statement": {
                     "REPORT_DATE": "report_date",
                     "SECURITY_CODE": "stock_code",
-                    "OPERATING_REVENUE": "revenue",
-                    "OPERATING_COST": "total_cost",
-                    "GROSS_PROFIT": "gross_profit",
-                    "OPERATING_PROFIT": "operating_profit",
+                    "OPERATE_INCOME": "revenue",
+                    "OPERATE_COST": "total_cost",
+                    "OPERATE_PROFIT": "operating_profit",
                     "TOTAL_PROFIT": "profit_before_tax",
-                    "NET_PROFIT": "net_profit",
+                    "NETPROFIT": "net_profit",
+                    "PARENT_NETPROFIT": "parent_net_profit",
                     "BASIC_EPS": "eps",
-                    "SELLING_EXPENSE": "selling_expense",
-                    "ADMINISTRATIVE_EXPENSE": "admin_expense",
-                    "FINANCIAL_EXPENSE": "financial_expense",
-                    "RD_EXPENSE": "rd_expense",
-                    "TAX_EXPENSE": "tax_expense",
+                    "SALE_EXPENSE": "selling_expense",
+                    "MANAGE_EXPENSE": "admin_expense",
+                    "FINANCE_EXPENSE": "financial_expense",
+                    "RESEARCH_EXPENSE": "rd_expense",
+                    "OPERATE_TAX_ADD": "tax_expense",
+                    "INTEREST_EXPENSE": "interest_expense",
+                    "ASSET_IMPAIRMENT_LOSS": "asset_impairment_loss",
                 },
                 "cash_flow": {
                     "REPORT_DATE": "report_date",
@@ -217,6 +225,11 @@ class ASHareAdapter(BaseAdapter):
 
         df = df.rename(columns=renamed_columns)
 
+        # 删除 _YOY 同比列 (AkShare 每个字段都带 _YOY 列，不需要)
+        yoy_cols = [c for c in df.columns if str(c).endswith("_YOY")]
+        if yoy_cols:
+            df = df.drop(columns=yoy_cols)
+
         # 添加原始数据源标识
         df["_raw_data_source"] = self.adapter_name
 
@@ -266,7 +279,7 @@ class ASHareAdapter(BaseAdapter):
 
         date_str = df["REPORT_DATE"].astype(str)
         is_annual = date_str.str.contains(
-            r"(1231|12-31|12/31)\s*(00:00:00)?$", regex=True
+            r"(?:1231|12-31|12/31)\s*(?:00:00:00)?$", regex=True
         )
         if period == "annual":
             return df[is_annual]
@@ -310,6 +323,7 @@ class ASHareAdapter(BaseAdapter):
                 )
             df = self._map_fields(df, "balance_sheet")
             df = self._standardize_date_column(df, "report_date")
+            df = self._fill_balance_derived(df)
             return df
         except DataNotAvailableError:
             raise
@@ -357,6 +371,7 @@ class ASHareAdapter(BaseAdapter):
                 )
             df = self._map_fields(df, "income_statement")
             df = self._standardize_date_column(df, "report_date")
+            df = self._fill_income_derived(df)
             return df
         except DataNotAvailableError:
             raise
@@ -501,6 +516,45 @@ class ASHareAdapter(BaseAdapter):
         result_df = pd.DataFrame(rows)
 
         return result_df
+
+    def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """资产负债表数据自愈: 推算缺失的标准字段"""
+        if df is None or df.empty:
+            return df
+
+        # 推算 total_equity = total_assets - total_liabilities
+        if "total_equity" not in df.columns or df["total_equity"].isna().all():
+            if "total_assets" in df.columns and "total_liabilities" in df.columns:
+                df["total_equity"] = df["total_assets"] - df["total_liabilities"]
+
+        # 推算 current_liabilities = total_liabilities - non_current_liabilities
+        if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
+            if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
+                df["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+
+        return df
+
+    def _fill_income_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """利润表数据自愈: 推算缺失的标准字段"""
+        if df is None or df.empty:
+            return df
+
+        # 推算 gross_profit = revenue - total_cost
+        if "gross_profit" not in df.columns or df["gross_profit"].isna().all():
+            if "revenue" in df.columns and "total_cost" in df.columns:
+                df["gross_profit"] = df["revenue"] - df["total_cost"]
+
+        # 推算 revenue = operating_profit + total_cost (如果revenue缺失)
+        if "revenue" not in df.columns or df["revenue"].isna().all():
+            if "operating_profit" in df.columns and "total_cost" in df.columns:
+                df["revenue"] = df["operating_profit"] + df["total_cost"]
+
+        # 推算 net_profit = profit_before_tax * (1 - approximate_tax_rate)
+        if "net_profit" not in df.columns or df["net_profit"].isna().all():
+            if "profit_before_tax" in df.columns:
+                df["net_profit"] = df["profit_before_tax"] * 0.75  # 假设25%税率
+
+        return df
 
     def is_available(self) -> bool:
         """检查akshare是否可用"""

@@ -46,7 +46,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
 
     # 股票代码正则
     HK_STOCK_PATTERN = re.compile(r"^\d{4,5}\.HK$")
-    US_STOCK_PATTERN = re.compile(r"^[A-Z]{1,5}\.US$|^[A-Z]{1,5}$")
+    US_STOCK_PATTERN = re.compile(r"^[A-Z]{1,5}(\.[A-Z])?\.US$|^[A-Z]{1,5}(\.[A-Z])?$")
     CN_STOCK_PATTERN = re.compile(r"^\d{6}\.(SH|SZ)$")
 
     # LongBridge 字段名到标准字段名的映射
@@ -668,6 +668,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
         推算规则:
         - total_equity = total_assets - total_liabilities (缺失时)
         - bvps = total_equity / share_capital (缺失时)
+        - debt_to_equity = total_liabilities / total_equity (缺失时)
 
         Args:
             df: 宽格式 DataFrame
@@ -678,10 +679,13 @@ class LongbridgeCLIAdapter(BaseAdapter):
         if df.empty:
             return df
 
+        derived_fields = []
+
         # 推算 total_equity
         if "total_equity" not in df.columns or df["total_equity"].isna().all():
             if "total_assets" in df.columns and "total_liabilities" in df.columns:
                 df["total_equity"] = df["total_assets"] - df["total_liabilities"]
+                derived_fields.append("total_equity = total_assets - total_liabilities")
 
         # 推算 bvps = total_equity / share_capital
         if "bvps" not in df.columns or df["bvps"].isna().all():
@@ -691,6 +695,20 @@ class LongbridgeCLIAdapter(BaseAdapter):
             ):
                 mask = df["share_capital"].notna() & (df["share_capital"] != 0)
                 df.loc[mask, "bvps"] = df.loc[mask, "total_equity"] / df.loc[mask, "share_capital"]
+                derived_fields.append("bvps = total_equity / share_capital")
+
+        # 推算 debt_to_equity = total_liabilities / total_equity
+        if "debt_to_equity" not in df.columns or df["debt_to_equity"].isna().all():
+            if "total_liabilities" in df.columns and "total_equity" in df.columns:
+                mask = df["total_equity"].notna() & (df["total_equity"] != 0)
+                df.loc[mask, "debt_to_equity"] = df.loc[mask, "total_liabilities"] / df.loc[mask, "total_equity"]
+                derived_fields.append("debt_to_equity = total_liabilities / total_equity")
+
+        # 记录推算信息
+        if derived_fields:
+            df["_derived_fields"] = "; ".join(derived_fields)
+            for field in derived_fields:
+                logger.info(f"Data self-healing: derived {field}")
 
         return df
 
@@ -700,6 +718,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
 
         推算规则:
         - gross_profit = revenue * gross_margin / 100 (缺失时)
+        - total_cost = revenue - gross_profit (缺失时)
 
         Args:
             df: 宽格式 DataFrame
@@ -710,10 +729,25 @@ class LongbridgeCLIAdapter(BaseAdapter):
         if df.empty:
             return df
 
+        derived_fields = []
+
         # 推算 gross_profit
         if "gross_profit" not in df.columns or df["gross_profit"].isna().all():
             if "revenue" in df.columns and "gross_margin" in df.columns:
                 df["gross_profit"] = df["revenue"] * df["gross_margin"] / 100
+                derived_fields.append("gross_profit = revenue * gross_margin / 100")
+
+        # 推算 total_cost = revenue - gross_profit
+        if "total_cost" not in df.columns or df["total_cost"].isna().all():
+            if "revenue" in df.columns and "gross_profit" in df.columns:
+                df["total_cost"] = df["revenue"] - df["gross_profit"]
+                derived_fields.append("total_cost = revenue - gross_profit")
+
+        # 记录推算信息
+        if derived_fields:
+            df["_derived_fields"] = "; ".join(derived_fields)
+            for field in derived_fields:
+                logger.info(f"Data self-healing: derived {field}")
 
         return df
 

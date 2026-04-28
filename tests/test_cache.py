@@ -8,6 +8,8 @@ from financial_sdk.cache import (
     FinancialCache,
     get_cache,
     clear_cache,
+    clear_cache_stock,
+    clear_cache_pattern,
 )
 
 
@@ -147,6 +149,36 @@ class TestFinancialCache:
         assert "key1" in cache
         assert "key2" not in cache
 
+    def test_ttl_constants(self):
+        """测试缓存TTL常量"""
+        assert FinancialCache.TTL_ANNUAL == 24 * 60 * 60  # 24小时
+        assert FinancialCache.TTL_QUARTERLY == 4 * 60 * 60  # 4小时
+        assert FinancialCache.TTL_PRICE == 5 * 60  # 5分钟
+        assert FinancialCache.TTL_STATIC == FinancialCache.TTL_ANNUAL
+        assert FinancialCache.TTL_DYNAMIC == FinancialCache.TTL_QUARTERLY
+
+    def test_invalidate_stock(self):
+        """测试按股票清除缓存"""
+        cache = FinancialCache()
+        cache.set("HK_0700.HK_balance_sheet_annual", "data1")
+        cache.set("HK_0700.HK_income_statement_annual", "data2")
+        cache.set("HK_9992.HK_balance_sheet_annual", "data3")
+        count = cache.invalidate_stock("0700.HK")
+        assert count == 2
+        assert len(cache) == 1
+
+    def test_set_with_different_ttl(self):
+        """测试不同TTL设置"""
+        cache = FinancialCache()
+        cache.set("annual_key", "data1", ttl=FinancialCache.TTL_ANNUAL)
+        cache.set("price_key", "data2", ttl=FinancialCache.TTL_PRICE)
+        # 年度数据应该存在
+        hit, value = cache.get("annual_key")
+        assert hit is True
+        # 价格数据也应该存在（刚创建）
+        hit, value = cache.get("price_key")
+        assert hit is True
+
 
 class TestGlobalCache:
     """测试全局缓存"""
@@ -164,3 +196,21 @@ class TestGlobalCache:
         clear_cache()
         hit, _ = cache.get("test_key")
         assert hit is False
+
+    def test_clear_cache_stock(self):
+        """测试按股票清除全局缓存"""
+        cache = get_cache()
+        cache.set("HK_0700.HK_balance_sheet_annual", "data1")
+        cache.set("HK_9992.HK_balance_sheet_annual", "data2")
+        count = clear_cache_stock("0700.HK")
+        assert count == 1
+        clear_cache()  # 清理
+
+    def test_clear_cache_pattern(self):
+        """测试按模式清除全局缓存"""
+        cache = get_cache()
+        cache.set("A_600000.SH_balance_sheet_annual", "data1")
+        cache.set("HK_0700.HK_balance_sheet_annual", "data2")
+        count = clear_cache_pattern("A_*")
+        assert count == 1
+        clear_cache()  # 清理

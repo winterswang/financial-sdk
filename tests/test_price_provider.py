@@ -138,25 +138,19 @@ class TestPriceProvider:
 class TestPriceProviderWithMock:
     """带 Mock 的 PriceProvider 测试"""
 
-    @patch("requests.get")
-    def test_get_price_from_yahoo_success(self, mock_get):
+    @patch.object(PriceProvider, "_get_price_from_akshare", return_value=None)
+    @patch.object(PriceProvider, "_get_price_from_yahoo")
+    def test_get_price_from_yahoo_success(self, mock_yahoo, mock_akshare):
         """测试 Yahoo Finance 获取成功"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "chart": {
-                "result": [
-                    {
-                        "meta": {
-                            "regularMarketPrice": 9.86,
-                            "currency": "CNY",
-                        },
-                        "timestamp": [1704067200],
-                    }
-                ]
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+        from financial_sdk.price.price_provider import PriceData
+        mock_yahoo.return_value = PriceData(
+            stock_code="600000.SH",
+            market="A",
+            current_price=9.86,
+            currency="CNY",
+            price_date="2024-01-01",
+            source="yahoo",
+        )
 
         provider = PriceProvider()
         provider._cache.clear()  # 清除缓存
@@ -166,29 +160,22 @@ class TestPriceProviderWithMock:
         assert result.price.current_price == 9.86
         assert result.price.currency == "CNY"
 
-    @patch("requests.get")
-    def test_get_price_batch(self, mock_get):
+    @patch.object(PriceProvider, "_get_price_from_akshare", return_value=None)
+    @patch.object(PriceProvider, "_get_price_from_yahoo")
+    def test_get_price_batch(self, mock_yahoo, mock_akshare):
         """测试批量获取价格"""
-        mock_response = MagicMock()
-        mock_response.json.return_value = {
-            "chart": {
-                "result": [
-                    {
-                        "meta": {
-                            "regularMarketPrice": 270.23,
-                            "currency": "USD",
-                        },
-                        "timestamp": [1704067200],
-                    }
-                ]
-            }
-        }
-        mock_response.raise_for_status = MagicMock()
-        mock_get.return_value = mock_response
+        from financial_sdk.price.price_provider import PriceData
+        mock_yahoo.return_value = PriceData(
+            stock_code="AAPL",
+            market="US",
+            current_price=270.23,
+            currency="USD",
+            price_date="2024-01-01",
+            source="yahoo",
+        )
 
         provider = PriceProvider()
         provider._cache.clear()
         results = provider.get_price_batch(["AAPL"])
 
         assert "AAPL" in results
-        # 注意: 由于市场识别问题，结果可能不是完全成功的

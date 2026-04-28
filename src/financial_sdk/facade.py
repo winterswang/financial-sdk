@@ -157,6 +157,11 @@ class FinancialFacade:
                 df = self._fetch_report(adapter, stock_code, rtype, period)
                 self._attach_report(bundle, rtype, df)
                 successful_reports.append(rtype)
+                # 检查适配器自愈推算的字段，记录到 warnings
+                if df is not None and not df.empty and "_derived_fields" in df.columns:
+                    derived = df["_derived_fields"].dropna().unique()
+                    for d in derived:
+                        warnings.append(f"{rtype} 自愈推算: {d}")
             except DataNotAvailableError as e:
                 warnings.append(f"{rtype}获取失败: {e.reason}")
                 is_partial = True
@@ -182,9 +187,9 @@ class FinancialFacade:
         # 缓存结果
         if self._enable_cache and successful_reports:
             ttl = (
-                FinancialCache.TTL_STATIC
+                FinancialCache.TTL_ANNUAL
                 if period == "annual"
-                else FinancialCache.TTL_DYNAMIC
+                else FinancialCache.TTL_QUARTERLY
             )
             self._cache.set(cache_key, bundle, ttl)
 

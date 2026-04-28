@@ -80,8 +80,11 @@ class FinancialCache:
     """
 
     # TTL常量（秒）
-    TTL_STATIC = 24 * 60 * 60  # 24小时
-    TTL_DYNAMIC = 60 * 60  # 1小时
+    TTL_ANNUAL = 24 * 60 * 60  # 24小时 - 年度财务数据
+    TTL_QUARTERLY = 4 * 60 * 60  # 4小时 - 季度财务数据
+    TTL_PRICE = 5 * 60  # 5分钟 - 实时价格数据
+    TTL_STATIC = TTL_ANNUAL  # 兼容旧代码
+    TTL_DYNAMIC = TTL_QUARTERLY  # 兼容旧代码
 
     # 默认缓存大小
     DEFAULT_MAX_SIZE = 1000
@@ -204,6 +207,24 @@ class FinancialCache:
         stats_dict["max_size"] = self._max_size
         return stats_dict
 
+    def invalidate_stock(self, stock_code: str) -> int:
+        """
+        清除指定股票的所有缓存
+
+        Args:
+            stock_code: 股票代码 (如 9992.HK)
+
+        Returns:
+            int: 删除的缓存数量
+        """
+        keys_to_delete = [
+            k for k in self._cache.keys()
+            if stock_code in k
+        ]
+        for key in keys_to_delete:
+            del self._cache[key]
+        return len(keys_to_delete)
+
     def get_all_keys(self) -> List[str]:
         """获取所有缓存键"""
         return list(self._cache.keys())
@@ -250,4 +271,11 @@ def clear_cache_pattern(pattern: str) -> int:
     """清除匹配模式的全局缓存"""
     if _global_cache is not None:
         return _global_cache.invalidate_pattern(pattern)
+    return 0
+
+
+def clear_cache_stock(stock_code: str) -> int:
+    """清除指定股票的全局缓存"""
+    if _global_cache is not None:
+        return _global_cache.invalidate_stock(stock_code)
     return 0
