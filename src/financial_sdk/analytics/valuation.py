@@ -4,12 +4,18 @@
 提供基于价格和财务数据的估值指标计算。
 """
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .analytics_base import BaseAnalyzer
 from ..price import PriceProvider, get_price_provider
+
+logger = logging.getLogger(__name__)
+
+# 缓存汇率，避免重复调用
+_exchange_rate_cache: Dict[str, float] = {}
 
 
 @dataclass
@@ -167,10 +173,21 @@ class ValuationAnalyzer(BaseAnalyzer):
         cash_flow = fs_data["cash_flow"]
         indicators = fs_data["indicators"]
 
+        # 判断市场
+        from ..adapter_manager import get_adapter_manager
+        market = get_adapter_manager().get_market_for_stock(stock_code)
+
         # 获取关键财务指标
         eps = self._get_value(income, "eps") or self._get_value(
             indicators, "eps"
         )  # 优先使用利润表的EPS
+        # 美股: 优先使用 ADS EPS (与股价同币种、同单位)
+        ads_eps = self._get_value(income, "ads_eps") or self._get_value(
+            indicators, "ads_eps"
+        )
+        if market == "US" and ads_eps:
+            eps = ads_eps  # 用 ADS EPS 替代普通股 EPS
+
         bvps = self._get_value(indicators, "bvps")  # 从指标表获取每股净资产
         revenue = self._get_value(income, "revenue")
         net_profit = self._get_value(income, "net_profit")
@@ -180,9 +197,25 @@ class ValuationAnalyzer(BaseAnalyzer):
         cash = self._get_value(balance, "cash_and_equivalents")
         depreciation = self._get_value(cash_flow, "depreciation_amortization")
 
-        # 计算总股本: 总股本 = 总权益 / 每股净资产
+        # 计算总股本
+        # 美股: 优先用加权平均股数推算 ADS 数量
+        weighted_avg_shares = self._get_value(income, "weighted_avg_shares")
         shares = None
-        if total_equity and bvps and bvps > 0:
+        if market == "US" and weighted_avg_shares and weighted_avg_shares > 0:
+            # ADS ratio 推断: ads_eps / eps (如果都有值)
+            ordinary_eps = self._get_value(income, "eps")
+            if ordinary_eps and ads_eps and ordinary_eps != 0:
+                ads_ratio = ads_eps / ordinary_eps
+                if ads_ratio > 0:
+                    shares = weighted_avg_shares / ads_ratio  # ADS 数量
+            # 如果推断不出 ads_ratio，用常见默认值
+            if shares is None:
+                # 大多数中概股 1 ADS = 4 或 5 普通股
+                # 用 bvps 反推
+                if total_equity and bvps and bvps > 0:
+                    shares = total_equity / bvps
+
+        if shares is None and total_equity and bvps and bvps > 0:
             shares = total_equity / bvps
 
         # 计算市值
@@ -200,8 +233,39 @@ class ValuationAnalyzer(BaseAnalyzer):
             interest_expense = self._get_value(income, "interest_expense") or 0
             ebitda = net_profit + tax_expense + interest_expense + (depreciation or 0)
 
-        # 计算指标
-        pe_ratio = self._calculator.calculate_pe_ratio(current_price, eps)
+        # 计算 PE: 优先使用 Market Cap / Net Profit
+        # 需要注意货币统一: 市值货币 和 利润货币 可能不同
+        pe_ratio = None
+        price_currency = price_data.currency  # e.g. "USD"
+        # 推断财务数据货币: 从 bundle._raw_data_source 或字段名推断
+        financial_currency = self._infer_financial_currency(income)
+
+        if market_cap and net_profit and net_profit > 0:
+            if price_currency == financial_currency:
+                # 同币种: Market Cap / Net Profit
+                pe_ratio = market_cap / net_profit
+            else:
+                # 不同币种: 将 net_profit 转换为价格货币
+                rate = self._get_exchange_rate(financial_currency, price_currency)
+                if rate:
+                    net_profit_converted = net_profit * rate
+                    pe_ratio = market_cap / net_profit_converted
+                # 回退: 如果有 ADS EPS，用 Price / ADS_EPS（需检查币种）
+                elif market == "US" and ads_eps and ads_eps > 0:
+                    # 如果 ADS EPS 和 price 同币种
+                    if price_currency == "USD" and financial_currency == "CNY":
+                        # AkShare 的 ADS EPS 是 CNY，需转换
+                        ads_eps_usd = ads_eps / rate if rate else None
+                        if ads_eps_usd and ads_eps_usd > 0:
+                            pe_ratio = current_price / ads_eps_usd
+
+        # 回退: Price / EPS (仅在币种匹配时使用)
+        if pe_ratio is None and eps and eps > 0:
+            if price_currency == financial_currency:
+                pe_ratio = self._calculator.calculate_pe_ratio(current_price, eps)
+            elif market == "US" and ads_eps and ads_eps > 0:
+                # ADS EPS 可能在价格货币下 (如 LongBridge 返回的 USD ADS EPS)
+                pe_ratio = current_price / ads_eps
         pb_ratio = self._calculator.calculate_pb_ratio(
             current_price, total_equity, shares
         )
@@ -245,6 +309,113 @@ class ValuationAnalyzer(BaseAnalyzer):
             price_source=price_data.source,
             calculation_timestamp=datetime.now().isoformat(),
         )
+
+    def _infer_financial_currency(self, df: Optional[Any]) -> str:
+        """
+        推断财务数据的货币单位
+
+        AkShare 返回的美股数据是 CNY，港股数据是 HKD。
+        通过检查列名中的货币后缀或数据源来推断。
+
+        Args:
+            df: DataFrame
+
+        Returns:
+            货币代码 ("CNY", "USD", "HKD")
+        """
+        if df is None or df.empty:
+            return "CNY"
+
+        # 检查 _raw_data_source 标识
+        if "_raw_data_source" in df.columns:
+            source = str(df["_raw_data_source"].iloc[0])
+            # AkShare 美股数据是人民币
+            if source == "akshare_us":
+                return "CNY"
+            # AkShare A 股是人民币
+            if source == "akshare":
+                return "CNY"
+            # AkShare 港股是港币
+            if source == "akshare_hk":
+                return "HKD"
+            # LongBridge 数据检查列名中的货币后缀
+            if source == "longbridge_cli":
+                for col in df.columns:
+                    if "(USD)" in col:
+                        return "USD"
+                    if "(HKD)" in col:
+                        return "HKD"
+                    if "(CNY)" in col:
+                        return "CNY"
+
+        # 检查列名中的货币后缀
+        for col in df.columns:
+            if "(USD)" in col:
+                return "USD"
+            if "(HKD)" in col:
+                return "HKD"
+            if "(CNY)" in col:
+                return "CNY"
+
+        return "CNY"
+
+    def _get_exchange_rate(self, from_currency: str, to_currency: str) -> Optional[float]:
+        """
+        获取汇率
+
+        Args:
+            from_currency: 源货币
+            to_currency: 目标货币
+
+        Returns:
+            汇率 (1 from_currency = N to_currency)，如果同币种返回 1.0
+        """
+        if from_currency == to_currency:
+            return 1.0
+
+        cache_key = f"{from_currency}_{to_currency}"
+        if cache_key in _exchange_rate_cache:
+            return _exchange_rate_cache[cache_key]
+
+        try:
+            import akshare as ak
+            # 使用 AkShare 获取汇率
+            symbol_map = {
+                "CNY_USD": "美元",
+                "HKD_USD": "港币",
+            }
+            symbol = symbol_map.get(cache_key)
+            if symbol:
+                df = ak.currency_boc_sina(symbol=symbol)
+                if df is not None and not df.empty:
+                    # 中行折算价: 100外币 = N 人民币
+                    boc_rate = float(df["中行折算价"].iloc[-1]) / 100.0
+                    if from_currency == "CNY" and to_currency == "USD":
+                        rate = 1.0 / boc_rate  # 1 CNY = N USD
+                    elif from_currency == "HKD" and to_currency == "USD":
+                        rate = 1.0 / boc_rate  # 1 HKD = N USD (via CNY)
+                    elif from_currency == "CNY" and to_currency == "HKD":
+                        rate = boc_rate  # 近似
+                    else:
+                        rate = 1.0 / boc_rate
+                    _exchange_rate_cache[cache_key] = rate
+                    return rate
+        except Exception as e:
+            logger.warning(f"Failed to get exchange rate {from_currency}->{to_currency}: {e}")
+
+        # 硬编码的备用汇率
+        fallback_rates = {
+            "CNY_USD": 0.138,   # 1 CNY ≈ 0.138 USD
+            "USD_CNY": 7.24,    # 1 USD ≈ 7.24 CNY
+            "HKD_USD": 0.128,   # 1 HKD ≈ 0.128 USD
+            "USD_HKD": 7.81,    # 1 USD ≈ 7.81 HKD
+            "CNY_HKD": 1.085,   # 1 CNY ≈ 1.085 HKD
+            "HKD_CNY": 0.922,   # 1 HKD ≈ 0.922 CNY
+        }
+        rate = fallback_rates.get(cache_key)
+        if rate:
+            _exchange_rate_cache[cache_key] = rate
+        return rate
 
     def _get_yoy_growth(self, stock_code: str, field: str) -> Optional[float]:
         """

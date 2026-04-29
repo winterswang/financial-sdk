@@ -165,6 +165,11 @@ class LongbridgeCLIAdapter(BaseAdapter):
         "经营现金流(CNY)": "operating_cash_flow",
         "投资现金流(CNY)": "investing_cash_flow",
         "融资现金流(CNY)": "financing_cash_flow",
+        # === ADS/股数字段 (美股中概股) ===
+        "基本每股收益-ADS": "ads_eps",
+        "摊薄每股收益-ADS": "ads_diluted_eps",
+        "基本加权平均股数-普通股": "weighted_avg_shares",
+        "摊薄加权平均股数-普通股": "diluted_weighted_avg_shares",
     }
 
     # "及占比"后缀字段映射: 原始名 → 标准绝对值字段名
