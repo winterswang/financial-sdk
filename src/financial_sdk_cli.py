@@ -839,14 +839,21 @@ def cmd_analyze(args):
 
         else:
             # 获取完整分析报告
-            if args.format == "table":
+            # 指定了 -y 年份时，自动使用多年表格格式
+            use_multi_year = args.format == "table" or years_filter is not None
+            if use_multi_year:
                 # 多年表格格式
                 multi_year_data = analytics.get_multi_year_metrics(
-                    args.stock_code, args.period
+                    args.stock_code, args.period, years=list(years_filter) if years_filter else None
                 )
                 if not multi_year_data or not multi_year_data.get("report_dates"):
-                    print(f"无法获取 {args.stock_code} 的多年数据", file=sys.stderr)
-                    return 1
+                    # 多年数据不可用时，回退到单期报告
+                    report = analytics.get_full_report(args.stock_code, args.period)
+                    if report is None:
+                        print(f"无法获取 {args.stock_code} 的分析数据", file=sys.stderr)
+                        return 1
+                    print(report.pretty_print())
+                    return 0
                 print(_format_multi_year_metrics(multi_year_data, years_filter))
             else:
                 # 其他格式使用完整报告
