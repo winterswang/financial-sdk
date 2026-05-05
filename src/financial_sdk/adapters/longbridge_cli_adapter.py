@@ -13,6 +13,7 @@ Longbridge CLI 适配器
 
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
@@ -190,8 +191,37 @@ class LongbridgeCLIAdapter(BaseAdapter):
         Args:
             cli_path: longbridge CLI 路径，默认 "longbridge"
         """
-        self._cli_path = cli_path
-        self._check_cli()
+        # 尝试多个可能的 CLI 路径
+        possible_paths = [cli_path]
+        if cli_path == "longbridge":
+            possible_paths.extend(
+                [
+                    "/Users/wangguangchao/bin/longbridge",
+                    "/usr/local/bin/longbridge",
+                    "/opt/homebrew/bin/longbridge",
+                    os.path.expanduser("~/bin/longbridge"),
+                ]
+            )
+
+        self._cli_path = None
+        for path in possible_paths:
+            cli = shutil.which(path)
+            if cli is not None:
+                try:
+                    result = subprocess.run(
+                        [path, "--version"],
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    if result.returncode == 0:
+                        self._cli_path = path
+                        break
+                except Exception:
+                    continue
+
+        if self._cli_path is None:
+            self._cli_path = cli_path  # 保持原值以便后续调试
 
     def _normalize_stock_code(self, stock_code: str) -> str:
         """
@@ -694,20 +724,23 @@ class LongbridgeCLIAdapter(BaseAdapter):
 
         # 推算 bvps = total_equity / share_capital
         if "bvps" not in df.columns or df["bvps"].isna().all():
-            if (
-                "total_equity" in df.columns
-                and "share_capital" in df.columns
-            ):
+            if "total_equity" in df.columns and "share_capital" in df.columns:
                 mask = df["share_capital"].notna() & (df["share_capital"] != 0)
-                df.loc[mask, "bvps"] = df.loc[mask, "total_equity"] / df.loc[mask, "share_capital"]
+                df.loc[mask, "bvps"] = (
+                    df.loc[mask, "total_equity"] / df.loc[mask, "share_capital"]
+                )
                 derived_fields.append("bvps = total_equity / share_capital")
 
         # 推算 debt_to_equity = total_liabilities / total_equity
         if "debt_to_equity" not in df.columns or df["debt_to_equity"].isna().all():
             if "total_liabilities" in df.columns and "total_equity" in df.columns:
                 mask = df["total_equity"].notna() & (df["total_equity"] != 0)
-                df.loc[mask, "debt_to_equity"] = df.loc[mask, "total_liabilities"] / df.loc[mask, "total_equity"]
-                derived_fields.append("debt_to_equity = total_liabilities / total_equity")
+                df.loc[mask, "debt_to_equity"] = (
+                    df.loc[mask, "total_liabilities"] / df.loc[mask, "total_equity"]
+                )
+                derived_fields.append(
+                    "debt_to_equity = total_liabilities / total_equity"
+                )
 
         # 记录推算信息
         if derived_fields:

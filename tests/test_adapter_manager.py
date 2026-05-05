@@ -43,19 +43,22 @@ class TestAdapterManager:
         """测试选择A股适配器"""
         manager = AdapterManager()
         adapter = manager.select_adapter("600000.SH")
-        assert adapter.adapter_name == "akshare"
+        # LongBridge CLI 优先级最高（如果可用），否则使用 AkShare
+        assert adapter.adapter_name in ("akshare", "longbridge_cli")
 
     def test_select_adapter_hk(self):
         """测试选择港股适配器"""
         manager = AdapterManager()
         adapter = manager.select_adapter("0700.HK")
-        assert adapter.adapter_name == "akshare_hk"
+        # LongBridge CLI 优先级最高（如果可用），否则使用 AkShare
+        assert adapter.adapter_name in ("akshare_hk", "longbridge_cli")
 
     def test_select_adapter_us(self):
         """测试选择美股适配器"""
         manager = AdapterManager()
         adapter = manager.select_adapter("AAPL")
-        assert adapter.adapter_name == "akshare_us"
+        # LongBridge CLI 优先级最高（如果可用），否则使用 AkShare
+        assert adapter.adapter_name in ("akshare_us", "longbridge_cli")
 
     def test_get_adapters_by_market(self):
         """测试按市场获取适配器"""

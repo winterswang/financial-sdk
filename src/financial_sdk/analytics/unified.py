@@ -475,7 +475,9 @@ class FinancialAnalytics:
             failed_dims.append("safety")
 
         # 所有维度都失败时返回 None
-        if all(m is None for m in [valuation, profitability, efficiency, growth, safety]):
+        if all(
+            m is None for m in [valuation, profitability, efficiency, growth, safety]
+        ):
             logger.warning(
                 f"Stock {stock_code} analysis failed for ALL dimensions: {failed_dims}"
             )
@@ -551,7 +553,7 @@ class FinancialAnalytics:
 
             all_dates = sorted(
                 bundle.income_statement["report_date"].dropna().unique().tolist(),
-                reverse=True
+                reverse=True,
             )
 
             # 过滤年份
@@ -559,7 +561,12 @@ class FinancialAnalytics:
                 filtered_dates = []
                 for d in all_dates:
                     try:
-                        year = int(str(d)[:4])
+                        date_str = str(d)
+                        # 支持多种日期格式: FY 2025, 2025, 2025-12-31
+                        if date_str.startswith("FY "):
+                            year = int(date_str[3:].strip())
+                        else:
+                            year = int(date_str[:4])
                         if year in years:
                             filtered_dates.append(d)
                     except (ValueError, IndexError):
@@ -581,7 +588,9 @@ class FinancialAnalytics:
             }
 
             # 获取最新估值指标（只需要最新）
-            result["valuation"] = self._valuation.get_valuation_metrics(stock_code, period)
+            result["valuation"] = self._valuation.get_valuation_metrics(
+                stock_code, period
+            )
 
             # 对每个日期分别计算财务报表指标
             for date in all_dates:
@@ -626,9 +635,7 @@ class FinancialAnalytics:
         except Exception:
             return {}
 
-    def _create_period_bundle(
-        self, bundle: Any, date: str
-    ) -> Optional[Any]:
+    def _create_period_bundle(self, bundle: Any, date: str) -> Optional[Any]:
         """从完整bundle中提取单个时期的数据"""
         try:
             from ..models import FinancialBundle
@@ -641,7 +648,12 @@ class FinancialAnalytics:
             )
 
             # 过滤每个DataFrame到指定日期
-            for attr_name in ["income_statement", "balance_sheet", "cash_flow", "indicators"]:
+            for attr_name in [
+                "income_statement",
+                "balance_sheet",
+                "cash_flow",
+                "indicators",
+            ]:
                 df = getattr(bundle, attr_name, None)
                 if df is not None and not df.empty and "report_date" in df.columns:
                     filtered = df[df["report_date"] == date]
