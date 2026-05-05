@@ -9,6 +9,7 @@
 - 财务安全分析 (SafetyAnalyzer)
 - Piotroski F-Score (PiotroskiAnalyzer)
 - 自由现金流分析 (FCFAnalyzer)
+- 内在价值分析 (IntrinsicValueAnalyzer)
 - 统一入口 (FinancialAnalytics)
 """
 
@@ -21,6 +22,7 @@ from .growth import GrowthAnalyzer, GrowthMetrics
 from .safety import SafetyAnalyzer, SafetyMetrics
 from .piotroski import PiotroskiAnalyzer, PiotroskiMetrics, PiotroskiDetail
 from .fcf import FCFAnalyzer, FCFMetrics
+from .intrinsic_value import IntrinsicValueAnalyzer, IntrinsicValueMetrics
 from .unified import FinancialAnalytics, FullAnalysisReport
 
 __all__ = [
@@ -50,6 +52,9 @@ __all__ = [
     # 自由现金流分析
     "FCFAnalyzer",
     "FCFMetrics",
+    # 内在价值分析
+    "IntrinsicValueAnalyzer",
+    "IntrinsicValueMetrics",
     # 统一入口
     "FinancialAnalytics",
     "FullAnalysisReport",

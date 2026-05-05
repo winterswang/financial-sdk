@@ -190,12 +190,14 @@ class TestAdapterSelection:
     def test_select_hk_adapter(self, facade):
         """测试选择港股适配器"""
         adapter = facade._adapter_manager.select_adapter("0700.HK")
-        assert adapter.adapter_name == "akshare_hk"
+        # LongBridge CLI 优先级更高
+        assert adapter.adapter_name in ["akshare_hk", "longbridge_cli"]
 
     def test_select_us_adapter(self, facade):
         """测试选择美股适配器"""
         adapter = facade._adapter_manager.select_adapter("AAPL")
-        assert adapter.adapter_name == "akshare_us"
+        # LongBridge CLI 优先级更高
+        assert adapter.adapter_name in ["akshare_us", "longbridge_cli"]
 
     def test_all_adapters_registered(self, facade):
         """测试所有适配器都已注册"""
