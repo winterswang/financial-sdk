@@ -527,10 +527,59 @@ class ASHareAdapter(BaseAdapter):
             if "total_assets" in df.columns and "total_liabilities" in df.columns:
                 df["total_equity"] = df["total_assets"] - df["total_liabilities"]
 
-        # 推算 current_liabilities = total_liabilities - non_current_liabilities
+        # 推算 current_assets: 尝试从各流动资产字段汇总
+        # AkShare A股报表包含大量流动资产/负债字段，尝试汇总
+        if "current_assets" not in df.columns or df["current_assets"].isna().all():
+            current_asset_fields = [
+                "CASH_DEPOSIT_PBC", "DEPOSIT_INTERBANK", "PRECIOUS_METAL", "LEND_FUND",
+                "FVTPL_FINASSET", "TRADE_FINASSET", "APPOINT_FVTPL_FINASSET",
+                "DERIVE_FINASSET", "BUY_RESALE_FINASSET", "ACCOUNTS_RECE", "FINANCE_RECE",
+                "INTEREST_RECE", "LOAN_ADVANCE", "TRADE_FINASSET_NOTFVTPL",
+                "CREDITOR_INVEST", "OTHER_CREDITOR_INVEST", "HOLDSALE_ASSET",
+                "AMORTIZE_COST_FINASSET", "FVTOCI_FINASSET", "INVEST_RECE",
+                "SHORT_TERM_INVEST", "NOTE_RECE", "INVENTORY", "ADVANCE_PAYMENT",
+                "DIVIDEND_RECE", "OTHER_CURRENT_ASSET", "TOTAL_CURRENT_ASSETS",
+            ]
+            sum_expr = df[current_asset_fields[0]]
+            for field in current_asset_fields[1:]:
+                if field in df.columns:
+                    sum_expr = sum_expr + df[field].fillna(0)
+            if "current_assets" not in df.columns:
+                df["current_assets"] = sum_expr
+
+        # 推算 current_liabilities: 尝试从各流动负债字段汇总
         if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
-            if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
-                df["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+            current_liab_fields = [
+                "SHORT_LOAN", "TRADE_FINLIAB_NOTFVTPL", "FVTPL_FINLIAB", "TRADE_FINLIAB",
+                "APPOINT_FVTPL_FINLIAB", "DERIVE_FINLIAB", "SELL_REPO_FINASSET",
+                "ACCEPT_DEPOSIT", "OUTWARD_REMIT", "CD_NOTE_PAYABLE", "DEPOSIT_CERTIFICATE",
+                "STAFF_SALARY_PAYABLE", "TAX_PAYABLE", "INTEREST_PAYABLE", "DIVIDEND_PAYABLE",
+                "PREDICT_LIAB", "AMORTIZE_COST_FINLIAB", "HOLDSALE_LIAB", "SHORT_FIN_PAYABLE",
+                "ACCRUED_EXPENSE", "NOTE_PAYABLE", "TOTAL_CURRENT_LIAB",
+            ]
+            sum_expr = df[current_liab_fields[0]]
+            for field in current_liab_fields[1:]:
+                if field in df.columns:
+                    sum_expr = sum_expr + df[field].fillna(0)
+            if "current_liabilities" not in df.columns:
+                df["current_liabilities"] = sum_expr
+
+        # 推算 inventory: 尝试从存货相关字段
+        if "inventory" not in df.columns or df["inventory"].isna().all():
+            inv_fields = ["INVENTORY", "PEND_MORTGAGE_ASSET", "MORTGAGE_ASSET_IMPAIRMENT",
+                         "NET_PENDMORTGAGE_ASSET", "HOLDSALE_ASSET"]
+            for field in inv_fields:
+                if field in df.columns and not df[field].isna().all():
+                    df["inventory"] = df[field].fillna(0)
+                    break
+
+        # 推算 accounts_payable: 尝试从应付相关字段
+        if "accounts_payable" not in df.columns or df["accounts_payable"].isna().all():
+            ap_fields = ["ACCOUNTS_PAYABLE", "NOTE_PAYABLE"]
+            for field in ap_fields:
+                if field in df.columns and not df[field].isna().all():
+                    df["accounts_payable"] = df[field].fillna(0)
+                    break
 
         return df
 

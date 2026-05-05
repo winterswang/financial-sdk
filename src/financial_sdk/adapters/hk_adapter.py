@@ -396,6 +396,7 @@ class HKAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "balance_sheet")
             df = self._map_fields(df, "balance_sheet")
             df = self._standardize_date_column(df, "report_date")
+            df = self._fill_balance_derived(df)
             return df
         except DataNotAvailableError:
             raise
@@ -438,6 +439,7 @@ class HKAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "income_statement")
             df = self._map_fields(df, "income_statement")
             df = self._standardize_date_column(df, "report_date")
+            df = self._fill_income_derived(df)
             return df
         except DataNotAvailableError:
             raise
@@ -536,3 +538,87 @@ class HKAdapter(BaseAdapter):
             return True
         except Exception:
             return False
+
+    def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """资产负债表数据自愈: 推算缺失的标准字段"""
+        if df is None or df.empty:
+            return df
+
+        bs_mapping = self._field_mapping.get("balance_sheet", {})
+
+        # 推算 total_equity = total_assets - total_liabilities
+        if "total_equity" not in df.columns or df["total_equity"].isna().all():
+            if "total_assets" in df.columns and "total_liabilities" in df.columns:
+                df["total_equity"] = df["total_assets"] - df["total_liabilities"]
+
+        # 推算 current_assets: 优先使用映射的字段
+        if "current_assets" not in df.columns or df["current_assets"].isna().all():
+            # 从原始列名映射中查找
+            for orig, mapped in bs_mapping.items():
+                if mapped == "current_assets" and orig in df.columns:
+                    df["current_assets"] = df[orig]
+                    break
+            # 或者从 total_assets - non_current_assets 计算
+            if "current_assets" not in df.columns or df["current_assets"].isna().all():
+                if "total_assets" in df.columns and "non_current_assets" in df.columns:
+                    df["current_assets"] = df["total_assets"] - df["non_current_assets"]
+
+        # 推算 current_liabilities
+        if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "current_liabilities" and orig in df.columns:
+                    df["current_liabilities"] = df[orig]
+                    break
+            if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
+                if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
+                    df["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+
+        # 推算 non_current_assets: 优先使用映射的字段
+        if "non_current_assets" not in df.columns or df["non_current_assets"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "non_current_assets" and orig in df.columns:
+                    df["non_current_assets"] = df[orig]
+                    break
+
+        # 推算 non_current_liabilities
+        if "non_current_liabilities" not in df.columns or df["non_current_liabilities"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "non_current_liabilities" and orig in df.columns:
+                    df["non_current_liabilities"] = df[orig]
+                    break
+
+        # 推算 inventory: 优先使用映射的字段
+        if "inventory" not in df.columns or df["inventory"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "inventory" and orig in df.columns:
+                    df["inventory"] = df[orig]
+                    break
+
+        # 推算 accounts_payable
+        if "accounts_payable" not in df.columns or df["accounts_payable"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "accounts_payable" and orig in df.columns:
+                    df["accounts_payable"] = df[orig]
+                    break
+
+        return df
+
+    def _fill_income_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """利润表数据自愈: 推算缺失的标准字段"""
+        if df is None or df.empty:
+            return df
+
+        inc_mapping = self._field_mapping.get("income_statement", {})
+
+        # 推算 total_cost: 优先使用映射的字段
+        if "total_cost" not in df.columns or df["total_cost"].isna().all():
+            for orig, mapped in inc_mapping.items():
+                if mapped == "total_cost" and orig in df.columns:
+                    df["total_cost"] = df[orig]
+                    break
+            # 或者从 revenue - gross_profit 推算
+            if "total_cost" not in df.columns or df["total_cost"].isna().all():
+                if "revenue" in df.columns and "gross_profit" in df.columns:
+                    df["total_cost"] = df["revenue"] - df["gross_profit"]
+
+        return df
