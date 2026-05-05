@@ -232,16 +232,21 @@ class SafetyAnalyzer(BaseAnalyzer):
         )
 
         # 计算 Altman Z-Score
-        # 需要市值: 市值 = 股价 × 总股本，总股本 = 总权益 / 每股净资产
-        market_cap = None
-        price_result = self._price_provider.get_price(stock_code)
-        if price_result.success and price_result.price:
-            current_price = price_result.price.current_price
-            if current_price and current_price > 0:
-                bvps = self._get_value(indicators, "bvps") if indicators is not None else None
-                if total_equity and bvps and bvps > 0:
-                    shares = total_equity / bvps
-                    market_cap = current_price * shares
+        # 优先使用 price_provider 获取市值
+        market_cap = self._price_provider.get_market_cap(stock_code)
+        if market_cap is None:
+            # 回退: 使用股价和 BVPS 计算市值
+            price_result = self._price_provider.get_price(stock_code)
+            if price_result.success and price_result.price:
+                current_price = price_result.price.current_price
+                if current_price and current_price > 0:
+                    # 优先从资产负债表获取 BVPS
+                    bvps = self._get_value(balance, "bvps")
+                    if bvps is None and indicators is not None:
+                        bvps = self._get_value(indicators, "bvps")
+                    if total_equity and bvps and bvps > 0:
+                        shares = total_equity / bvps
+                        market_cap = current_price * shares
 
         # 留存收益: 优先使用资产负债表中的未分配利润字段
         retained_earnings = self._get_value(balance, "retained_earnings")

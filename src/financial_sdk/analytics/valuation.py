@@ -188,7 +188,8 @@ class ValuationAnalyzer(BaseAnalyzer):
         if market == "US" and ads_eps:
             eps = ads_eps  # 用 ADS EPS 替代普通股 EPS
 
-        bvps = self._get_value(indicators, "bvps")  # 从指标表获取每股净资产
+        # 从指标表获取每股净资产，如果没有也从资产负债表获取
+        bvps = self._get_value(indicators, "bvps") or self._get_value(balance, "bvps")
         revenue = self._get_value(income, "revenue")
         net_profit = self._get_value(income, "net_profit")
         total_equity = self._get_value(balance, "total_equity")
@@ -280,7 +281,7 @@ class ValuationAnalyzer(BaseAnalyzer):
         pb_ratio = self._calculator.calculate_pb_ratio(
             current_price, total_equity, shares
         )
-        ps_ratio = self._calculator.calculate_ps_ratio(current_price, revenue, shares)
+        ps_ratio = self._calculator.calculate_ps_ratio(current_price, revenue, shares, market_cap)
         ev_ebitda = self._calculator.calculate_ev_ebitda(
             market_cap, total_debt, cash, ebitda
         )

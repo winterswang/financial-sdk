@@ -198,6 +198,7 @@ class TestValuationAnalyzerWithMock:
         mock_price_provider.get_price.return_value = PriceResult(
             success=True, price=mock_price
         )
+        mock_price_provider.get_market_cap.return_value = 986000000.0  # 市值
 
         # Mock FinancialFacade - 返回有数据的财务数据
         mock_facade = MagicMock()
@@ -531,6 +532,7 @@ class TestSafetyAnalyzer:
         mock_price_provider.get_price.return_value = PriceResult(
             success=True, price=mock_price
         )
+        mock_price_provider.get_market_cap.return_value = 2000000000.0  # 市值
 
         mock_facade = MagicMock()
         mock_bundle = MagicMock()
@@ -597,6 +599,7 @@ class TestFinancialAnalytics:
         mock_price_provider.get_price.return_value = PriceResult(
             success=True, price=mock_price
         )
+        mock_price_provider.get_market_cap.return_value = 2000000000.0  # 市值
 
         # Mock FinancialFacade
         mock_facade = MagicMock()

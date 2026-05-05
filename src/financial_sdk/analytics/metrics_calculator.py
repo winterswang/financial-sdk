@@ -56,7 +56,8 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_ps_ratio(
-        price: float, revenue: Optional[float], shares: Optional[float]
+        price: float, revenue: Optional[float], shares: Optional[float],
+        market_cap: Optional[float] = None
     ) -> Optional[float]:
         """
         计算市销率 (P/S Ratio)
@@ -65,11 +66,20 @@ class MetricsCalculator:
             price: 当前股价
             revenue: 营业收入
             shares: 流通股本
+            market_cap: 总市值 (可选，用于直接计算)
 
         Returns:
             市销率或 None
         """
-        if revenue is None or shares is None or shares == 0:
+        if revenue is None or revenue == 0:
+            return None
+
+        # 优先使用 market_cap 直接计算
+        if market_cap is not None and market_cap > 0:
+            return market_cap / revenue
+
+        # 回退到 price * shares / revenue
+        if shares is None or shares == 0:
             return None
         ps = revenue / shares
         if ps == 0:
@@ -550,6 +560,9 @@ class MetricsCalculator:
         - 1.81 < Z < 2.99: 灰色区
         - Z < 1.81: 危险区
 
+        Note:
+            如果 working_capital 不可用，仍可计算简化版 Z-Score (仅使用 x2-x5)
+
         Args:
             working_capital: 营运资本 (流动资产-流动负债)
             total_assets: 总资产
@@ -562,26 +575,51 @@ class MetricsCalculator:
         Returns:
             Z-Score 或 None
         """
-        if any(
-            v is None for v in [working_capital, total_assets, retained_earnings, ebit]
-        ):
+        if total_assets is None or total_assets == 0:
             return None
 
-        if total_assets == 0:
+        # 核心指标: retained_earnings, ebit, revenue 是必须的
+        if retained_earnings is None and ebit is None:
             return None
 
-        x1 = 1.2 * (working_capital / total_assets)
-        x2 = 1.4 * (retained_earnings / total_assets)
-        x3 = 3.3 * (ebit / total_assets)
+        z_score = 0.0
+        has_valid_component = False
 
-        if total_liabilities and total_liabilities > 0 and market_cap:
-            x4 = 0.6 * (market_cap / total_liabilities)
+        # X1: 营运资本 / 总资产 (可选)
+        if working_capital is not None:
+            z_score += 1.2 * (working_capital / total_assets)
+            has_valid_component = True
+
+        # X2: 留存收益 / 总资产 (重要)
+        if retained_earnings is not None:
+            z_score += 1.4 * (retained_earnings / total_assets)
+            has_valid_component = True
         else:
-            x4 = 0
+            # 回退: 使用净利润作为近似
+            if ebit is not None:
+                z_score += 1.4 * (ebit / total_assets) * 0.5  # 降低权重
+                has_valid_component = True
 
-        x5 = 1.0 * (revenue / total_assets) if revenue else 0
+        # X3: EBIT / 总资产 (重要)
+        if ebit is not None:
+            z_score += 3.3 * (ebit / total_assets)
+            has_valid_component = True
 
-        return x1 + x2 + x3 + x4 + x5
+        # X4: 市值 / 总负债 (重要)
+        if total_liabilities and total_liabilities > 0 and market_cap:
+            z_score += 0.6 * (market_cap / total_liabilities)
+            has_valid_component = True
+        elif market_cap and total_assets and total_assets > 0:
+            # 如果没有负债数据，使用市值/总资产
+            z_score += 0.6 * (market_cap / total_assets)
+            has_valid_component = True
+
+        # X5: 营业收入 / 总资产
+        if revenue is not None:
+            z_score += 1.0 * (revenue / total_assets)
+            has_valid_component = True
+
+        return z_score if has_valid_component else None
 
     @staticmethod
     def calculate_interest_coverage(

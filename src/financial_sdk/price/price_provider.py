@@ -12,6 +12,8 @@ import json
 import logging
 import os
 import re
+import shutil
+import subprocess
 import yaml
 from datetime import datetime, timezone
 from pathlib import Path
@@ -634,6 +636,89 @@ class PriceProvider:
 
         return None
 
+    def _get_market_cap_from_longbridge_cli(self, stock_code: str, market: str) -> Optional[float]:
+        """
+        从 LongBridge CLI static 命令获取市值
+
+        LongBridge CLI 的 static 命令返回 total_shares，
+        结合实时报价计算市值。
+
+        Args:
+            stock_code: 股票代码
+            market: 市场代码
+
+        Returns:
+            市值（价格货币单位）或 None
+        """
+        # 转换代码格式
+        lb_symbol = self._to_longbridge_symbol(stock_code, market)
+        if not lb_symbol:
+            return None
+
+        # 查找 LongBridge CLI 路径
+        cli_paths = [
+            "longbridge",
+            "/Users/wangguangchao/bin/longbridge",
+            "/usr/local/bin/longbridge",
+            "/opt/homebrew/bin/longbridge",
+            os.path.expanduser("~/bin/longbridge"),
+        ]
+        cli_path = None
+        for path in cli_paths:
+            if shutil.which(path):
+                cli_path = path
+                break
+
+        if not cli_path:
+            return None
+
+        try:
+            # 获取静态信息（含 total_shares）
+            result = subprocess.run(
+                [cli_path, "static", lb_symbol, "--format", "json"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if result.returncode != 0:
+                return None
+
+            static_data = json.loads(result.stdout)
+            if not static_data:
+                return None
+
+            info = static_data[0]
+            total_shares = info.get("total_shares")
+            if not total_shares:
+                return None
+
+            total_shares = float(total_shares)
+            if total_shares <= 0:
+                return None
+
+            # 获取实时价格
+            price_result = subprocess.run(
+                [cli_path, "quote", lb_symbol, "--format", "json"],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            if price_result.returncode != 0:
+                return None
+
+            quote_data = json.loads(price_result.stdout)
+            if not quote_data:
+                return None
+
+            last_price = quote_data[0].get("last")
+            if not last_price:
+                return None
+
+            return float(last_price) * total_shares
+
+        except Exception:
+            return None
+
     def get_market_cap(self, stock_code: str) -> Optional[float]:
         """
         获取股票市值
@@ -658,6 +743,11 @@ class PriceProvider:
 
         # 3. 从 Longbridge SDK 获取 (含 total_shares)
         market_cap = self._get_market_cap_from_longbridge_sdk(stock_code, market)
+        if market_cap:
+            return market_cap
+
+        # 3.5. 从 LongBridge CLI static 命令获取 (含 total_shares)
+        market_cap = self._get_market_cap_from_longbridge_cli(stock_code, market)
         if market_cap:
             return market_cap
 
