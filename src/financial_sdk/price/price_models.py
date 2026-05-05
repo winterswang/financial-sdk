@@ -22,6 +22,7 @@ class PriceData:
         price_date: 价格日期 (YYYY-MM-DD)
         source: 数据源 ("yahoo", "akshare")
         timestamp: 数据获取时间戳
+        market_cap: 总市值 (价格货币单位)
     """
 
     stock_code: str
@@ -31,6 +32,7 @@ class PriceData:
     price_date: Optional[str] = None
     source: str = "yahoo"
     timestamp: datetime = field(default_factory=datetime.now)
+    market_cap: Optional[float] = None
 
     def to_dict(self) -> dict:
         """转换为字典格式"""
@@ -42,6 +44,7 @@ class PriceData:
             "price_date": self.price_date,
             "source": self.source,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
+            "market_cap": self.market_cap,
         }
 
 

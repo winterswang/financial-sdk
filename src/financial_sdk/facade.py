@@ -163,11 +163,29 @@ class FinancialFacade:
                     for d in derived:
                         warnings.append(f"{rtype} 自愈推算: {d}")
             except DataNotAvailableError as e:
-                warnings.append(f"{rtype}获取失败: {e.reason}")
-                is_partial = True
+                # 尝试 fallback 到下一个适配器
+                fallback_df = self._try_fallback_adapter(
+                    stock_code, market, rtype, period, adapter.adapter_name
+                )
+                if fallback_df is not None:
+                    self._attach_report(bundle, rtype, fallback_df)
+                    successful_reports.append(rtype)
+                    warnings.append(f"{rtype}通过备用适配器获取")
+                else:
+                    warnings.append(f"{rtype}获取失败: {e.reason}")
+                    is_partial = True
             except Exception as e:
-                warnings.append(f"{rtype}获取异常: {str(e)}")
-                is_partial = True
+                # 尝试 fallback
+                fallback_df = self._try_fallback_adapter(
+                    stock_code, market, rtype, period, adapter.adapter_name
+                )
+                if fallback_df is not None:
+                    self._attach_report(bundle, rtype, fallback_df)
+                    successful_reports.append(rtype)
+                    warnings.append(f"{rtype}通过备用适配器获取")
+                else:
+                    warnings.append(f"{rtype}获取异常: {str(e)}")
+                    is_partial = True
 
         # 更新bundle状态
         bundle.warnings = warnings
@@ -240,6 +258,40 @@ class FinancialFacade:
             bundle.cash_flow = df
         elif report_type == "indicators":
             bundle.indicators = df
+
+    def _try_fallback_adapter(
+        self,
+        stock_code: str,
+        market: str,
+        report_type: str,
+        period: str,
+        failed_adapter_name: str,
+    ) -> Optional[pd.DataFrame]:
+        """
+        当主适配器失败时，尝试使用下一个适配器获取数据
+
+        Args:
+            stock_code: 股票代码
+            market: 市场代码
+            report_type: 报表类型
+            period: 期间类型
+            failed_adapter_name: 失败的适配器名称
+
+        Returns:
+            DataFrame 或 None
+        """
+        adapters = self._adapter_manager._market_adapters.get(market, [])
+        for adapter in adapters:
+            if adapter.adapter_name == failed_adapter_name:
+                continue
+            if not adapter.is_available():
+                continue
+            try:
+                df = self._fetch_report(adapter, stock_code, report_type, period)
+                return df
+            except Exception:
+                continue
+        return None
 
     def _get_report_types_to_fetch(self, report_type: str) -> List[str]:
         """

@@ -784,6 +784,7 @@ class TestFinancialAnalytics:
                 currency="CNY",
             )
         )
+        mock_price.get_market_cap.return_value = None
 
         # Mock FinancialFacade
         mock_facade = MagicMock()

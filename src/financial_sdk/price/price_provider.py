@@ -8,10 +8,13 @@
 """
 
 import importlib
+import json
+import logging
 import os
 import re
 import yaml
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 
@@ -53,6 +56,8 @@ SOCKS_PROXY_PORT = int(os.environ.get("SOCKS_PROXY_PORT", "7890"))
 
 # Longbridge 配置路径 (from environment)
 LONGBRIDGE_CONFIG_PATH = os.environ.get("LONGBRIDGE_CONFIG_PATH", "")
+
+logger = logging.getLogger(__name__)
 
 
 def _get_socks_session() -> Any:
@@ -188,6 +193,9 @@ class PriceProvider:
             else:
                 price_date = datetime.now().strftime("%Y-%m-%d")
 
+            # 获取市值 (Yahoo Finance meta 中可能包含)
+            market_cap = meta.get("marketCap")
+
             return PriceData(
                 stock_code=stock_code,
                 market=market,
@@ -195,6 +203,7 @@ class PriceProvider:
                 currency=currency,
                 price_date=price_date,
                 source="yahoo",
+                market_cap=float(market_cap) if market_cap else None,
             )
 
         except Exception:
@@ -298,6 +307,408 @@ class PriceProvider:
 
         except Exception:
             return None
+
+        return None
+
+    def _get_market_cap_from_longbridge_sdk(self, stock_code: str, market: str) -> Optional[float]:
+        """
+        从 Longbridge OpenAPI SDK 获取市值
+
+        Longbridge static_info 返回 total_shares/outstanding_shares，
+        结合实时报价计算市值。
+
+        Args:
+            stock_code: 股票代码
+            market: 市场代码
+
+        Returns:
+            市值（价格货币单位）或 None
+        """
+        try:
+            from longport.openapi import Config, QuoteContext
+            import json
+
+            # 1. 尝试从 LONGBRIDGE_CONFIG_PATH 环境变量
+            config_path = LONGBRIDGE_CONFIG_PATH
+
+            # 2. 尝试从 Longbridge Terminal token 文件自动发现
+            if not config_path:
+                token_dir = Path.home() / ".longbridge" / "openapi" / "tokens"
+                if token_dir.exists():
+                    token_files = list(token_dir.iterdir())
+                    if token_files:
+                        # 使用最新的 token 文件
+                        token_file = max(token_files, key=lambda p: p.stat().st_mtime)
+                        with open(token_file, "r") as f:
+                            token_data = json.load(f)
+
+                        client_id = token_data.get("client_id", "")
+                        access_token = token_data.get("access_token", "")
+
+                        if client_id and access_token:
+                            config = Config(
+                                app_key=client_id,
+                                app_secret="",
+                                access_token=access_token,
+                            )
+                            ctx = QuoteContext(config)
+
+                            # 转换代码格式
+                            lb_symbol = self._to_longbridge_symbol(stock_code, market)
+                            if not lb_symbol:
+                                return None
+
+                            # 获取静态信息 (含 total_shares)
+                            static_info = ctx.static_info([lb_symbol])
+                            if static_info:
+                                info = static_info[0]
+                                total_shares = getattr(info, "total_shares", None) or getattr(
+                                    info, "outstanding_shares", None
+                                )
+                                if total_shares and total_shares > 0:
+                                    # 获取实时价格
+                                    quotes = ctx.quote([lb_symbol])
+                                    if quotes:
+                                        price = float(quotes[0].last_done)
+                                        return price * total_shares
+
+            # 3. 尝试从 YAML 配置
+            if config_path and Path(config_path).exists():
+                with open(config_path, "r") as f:
+                    config_data = yaml.safe_load(f)
+                config = Config(
+                    app_key=config_data["app_key"],
+                    app_secret=config_data["app_secret"],
+                    access_token=config_data["access_token"],
+                )
+                ctx = QuoteContext(config)
+                lb_symbol = self._to_longbridge_symbol(stock_code, market)
+                if lb_symbol:
+                    static_info = ctx.static_info([lb_symbol])
+                    if static_info:
+                        info = static_info[0]
+                        total_shares = getattr(info, "total_shares", None) or getattr(
+                            info, "outstanding_shares", None
+                        )
+                        if total_shares and total_shares > 0:
+                            quotes = ctx.quote([lb_symbol])
+                            if quotes:
+                                price = float(quotes[0].last_done)
+                                return price * total_shares
+
+        except Exception as e:
+            error_msg = str(e)
+            # 如果是 token 过期，尝试刷新
+            if "401004" in error_msg or "token invalid" in error_msg.lower():
+                refreshed = self._refresh_longbridge_token_file()
+                if refreshed:
+                    # 重试一次
+                    try:
+                        from longport.openapi import Config, QuoteContext
+                        import json
+
+                        token_dir = Path.home() / ".longbridge" / "openapi" / "tokens"
+                        if token_dir.exists():
+                            token_files = list(token_dir.iterdir())
+                            if token_files:
+                                token_file = max(token_files, key=lambda p: p.stat().st_mtime)
+                                with open(token_file, "r") as f:
+                                    token_data = json.load(f)
+                                client_id = token_data.get("client_id", "")
+                                access_token = token_data.get("access_token", "")
+                                if client_id and access_token:
+                                    config = Config(
+                                        app_key=client_id,
+                                        app_secret="",
+                                        access_token=access_token,
+                                    )
+                                    ctx = QuoteContext(config)
+                                    lb_symbol = self._to_longbridge_symbol(stock_code, market)
+                                    if lb_symbol:
+                                        static_info = ctx.static_info([lb_symbol])
+                                        if static_info:
+                                            info = static_info[0]
+                                            total_shares = getattr(info, "total_shares", None) or getattr(
+                                                info, "outstanding_shares", None
+                                            )
+                                            if total_shares and total_shares > 0:
+                                                quotes = ctx.quote([lb_symbol])
+                                                if quotes:
+                                                    price = float(quotes[0].last_done)
+                                                    return price * total_shares
+                    except Exception as e2:
+                        logger.debug(f"Longbridge SDK retry failed for {stock_code}: {e2}")
+            else:
+                logger.debug(f"Longbridge SDK market cap failed for {stock_code}: {e}")
+
+        return None
+
+    def _refresh_longbridge_token_file(self) -> bool:
+        """
+        刷新 Longbridge Terminal token 文件中的 access_token
+
+        Returns:
+            是否刷新成功
+        """
+        import base64
+
+        try:
+            token_dir = Path.home() / ".longbridge" / "openapi" / "tokens"
+            if not token_dir.exists():
+                return False
+
+            token_files = list(token_dir.iterdir())
+            if not token_files:
+                return False
+
+            token_file = max(token_files, key=lambda p: p.stat().st_mtime)
+            with open(token_file, "r") as f:
+                token_data = json.load(f)
+
+            access_token = token_data.get("access_token", "")
+            if not access_token:
+                return False
+
+            # 解析 JWT 获取过期时间
+            payload = access_token.split(".")[1]
+            padding = 4 - len(payload) % 4
+            if padding != 4:
+                payload += "=" * padding
+            decoded = json.loads(base64.urlsafe_b64decode(payload))
+            expired_at = str(decoded.get("exp", ""))
+
+            # 通过 HTTP API 刷新
+            import requests as req
+
+            base_url = "https://openapi.lbkrs.com"
+            url = f"{base_url}/v1/token/refresh?expired_at={expired_at}"
+            headers = {"Authorization": access_token}
+
+            # 尝试直连
+            try:
+                resp = req.get(url, headers=headers, timeout=10)
+            except Exception:
+                # 直连失败，尝试 SOCKS 代理
+                try:
+                    session = _get_socks_session()
+                    resp = session.request("GET", url, headers=headers, timeout=10)
+                except Exception:
+                    return False
+
+            if not hasattr(resp, "status_code"):
+                # SOCKS 响应
+                if getattr(resp, "status", 0) != 200:
+                    return False
+                result = resp.json()
+            else:
+                if resp.status_code != 200:
+                    return False
+                result = resp.json()
+
+            if result.get("code") != 0:
+                return False
+
+            new_token = result.get("data", {}).get("access_token")
+            if not new_token:
+                return False
+
+            # 更新 token 文件
+            token_data["access_token"] = new_token
+            new_payload = new_token.split(".")[1]
+            np = 4 - len(new_payload) % 4
+            if np != 4:
+                new_payload += "=" * np
+            new_decoded = json.loads(base64.urlsafe_b64decode(new_payload))
+            token_data["expires_at"] = new_decoded.get("exp", 0)
+
+            with open(token_file, "w") as f:
+                json.dump(token_data, f, indent=2)
+
+            logger.info("Longbridge token refreshed successfully")
+            return True
+
+        except Exception as e:
+            logger.debug(f"Failed to refresh Longbridge token: {e}")
+            return False
+
+    def _get_market_cap_from_eastmoney(self, stock_code: str, market: str) -> Optional[float]:
+        """
+        从东方财富个股API获取市值
+
+        东方财富的 push2 API 返回个股详情，包括总市值 (f116)。
+        这是获取美股/港股/A股市值最可靠的方式之一。
+
+        Args:
+            stock_code: 股票代码
+            market: 市场代码
+
+        Returns:
+            市值（价格货币单位）或 None
+        """
+        try:
+            session = _get_socks_session()
+
+            if market == "US":
+                # 东方财富美股代码格式: 105.CODE (纳斯达克) 或 106.CODE (纽交所)
+                code = stock_code.replace(".US", "")
+                # 尝试纳斯达克(105)和纽交所(106)
+                for prefix in ["105", "106"]:
+                    secid = f"{prefix}.{code}"
+                    url = f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f116,f117"
+                    resp = session.request("GET", url, headers=YAHOO_HEADERS, timeout=10)
+                    if resp.status == 200:
+                        data = resp.json()
+                        market_cap = data.get("data", {}).get("f116")
+                        if market_cap and market_cap > 0:
+                            return float(market_cap)
+
+            elif market == "A":
+                # 东方财富A股代码: 1.CODE(SH) 或 0.CODE(SZ)
+                parts = stock_code.split(".")
+                code = parts[0]
+                suffix = parts[1] if len(parts) > 1 else ""
+                prefix = "1" if suffix == "SH" else "0"
+                secid = f"{prefix}.{code}"
+                url = f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f116,f117"
+                resp = session.request("GET", url, headers=YAHOO_HEADERS, timeout=10)
+                if resp.status == 200:
+                    data = resp.json()
+                    market_cap = data.get("data", {}).get("f116")
+                    if market_cap and market_cap > 0:
+                        return float(market_cap)
+
+            elif market == "HK":
+                # 东方财富港股代码: 116.CODE
+                code = stock_code.replace(".HK", "").lstrip("0").zfill(5)
+                secid = f"116.{code}"
+                url = f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f116,f117"
+                resp = session.request("GET", url, headers=YAHOO_HEADERS, timeout=10)
+                if resp.status == 200:
+                    data = resp.json()
+                    market_cap = data.get("data", {}).get("f116")
+                    if market_cap and market_cap > 0:
+                        return float(market_cap)
+
+        except Exception:
+            pass
+
+        return None
+
+    def _get_market_cap_from_yahoo(self, stock_code: str, market: str) -> Optional[float]:
+        """
+        从 Yahoo Finance quoteSummary API 获取市值
+
+        Args:
+            stock_code: 股票代码
+            market: 市场代码
+
+        Returns:
+            市值（USD）或 None
+        """
+        yahoo_symbol = self._to_yahoo_symbol(stock_code, market)
+        if not yahoo_symbol:
+            return None
+
+        url = (
+            f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/"
+            f"{yahoo_symbol}?modules=defaultKeyStatistics"
+        )
+
+        try:
+            session = _get_socks_session()
+            resp = session.request("GET", url, headers=YAHOO_HEADERS, timeout=10)
+            if resp.status != 200:
+                return None
+            data = resp.json()
+
+            result_list = data.get("quoteSummary", {}).get("result", [])
+            if not result_list:
+                return None
+
+            stats = result_list[0].get("defaultKeyStatistics", {})
+            market_cap_raw = stats.get("marketCap", {}).get("raw")
+            if market_cap_raw:
+                return float(market_cap_raw)
+        except Exception:
+            pass
+
+        return None
+
+    def get_market_cap(self, stock_code: str) -> Optional[float]:
+        """
+        获取股票市值
+
+        Args:
+            stock_code: 股票代码
+
+        Returns:
+            市值（价格货币单位）或 None
+        """
+        market = self._get_market(stock_code)
+
+        # 1. 先从价格缓存中获取
+        result = self.get_price(stock_code, market=market)
+        if result.success and result.price and result.price.market_cap:
+            return result.price.market_cap
+
+        # 2. 从东方财富个股API获取 (最可靠，支持US/A/HK)
+        market_cap = self._get_market_cap_from_eastmoney(stock_code, market)
+        if market_cap:
+            return market_cap
+
+        # 3. 从 Longbridge SDK 获取 (含 total_shares)
+        market_cap = self._get_market_cap_from_longbridge_sdk(stock_code, market)
+        if market_cap:
+            return market_cap
+
+        # 4. 从 Yahoo quoteSummary API 获取
+        market_cap = self._get_market_cap_from_yahoo(stock_code, market)
+        if market_cap:
+            return market_cap
+
+        # 5. 从 AkShare 行情获取
+        try:
+            akshare = self._get_akshare()
+
+            if market == "US":
+                df = akshare.stock_us_spot_em()
+                # AkShare 美股代码格式: "105.PDD", 匹配后缀
+                code = stock_code.replace(".US", "")
+                matches = df[df["代码"].str.endswith(f".{code}")]
+                if matches.empty:
+                    # 也尝试直接匹配
+                    matches = df[df["代码"] == code]
+                if not matches.empty:
+                    row = matches.iloc[0]
+                    for col in ["总市值", "市值"]:
+                        if col in df.columns:
+                            val = row.get(col)
+                            if val and str(val) != "nan":
+                                return float(val)
+            elif market == "A":
+                df = akshare.stock_zh_a_spot()
+                search_code = stock_code.replace(".", "").lower()
+                matches = df[df["代码"].str.lower() == search_code]
+                if not matches.empty:
+                    row = matches.iloc[0]
+                    for col in ["总市值"]:
+                        if col in df.columns:
+                            val = row.get(col)
+                            if val and str(val) != "nan":
+                                return float(val)
+            elif market == "HK":
+                df = akshare.stock_hk_spot_em()
+                code = stock_code.replace(".HK", "").lstrip("0").zfill(4)
+                matches = df[df["代码"] == code]
+                if not matches.empty:
+                    row = matches.iloc[0]
+                    for col in ["总市值"]:
+                        if col in df.columns:
+                            val = row.get(col)
+                            if val and str(val) != "nan":
+                                return float(val)
+        except Exception:
+            pass
 
         return None
 
@@ -521,6 +932,18 @@ class PriceProvider:
             price = None
 
         if price:
+            # 如果没有市值，尝试补充获取
+            if price.market_cap is None:
+                # 东方财富个股API (最可靠)
+                market_cap = self._get_market_cap_from_eastmoney(stock_code, market)
+                if not market_cap:
+                    # Longbridge SDK (含 total_shares)
+                    market_cap = self._get_market_cap_from_longbridge_sdk(stock_code, market)
+                if not market_cap:
+                    # Yahoo quoteSummary
+                    market_cap = self._get_market_cap_from_yahoo(stock_code, market)
+                if market_cap:
+                    price.market_cap = market_cap
             # 存入缓存
             self._cache.set(cache_key, price, PRICE_CACHE_TTL)
             return PriceResult(success=True, price=price)
