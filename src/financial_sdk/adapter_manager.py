@@ -158,6 +158,13 @@ class AdapterManager:
                 last_error=f"市场 {market} 没有可用的适配器",
             )
 
+        # A股特殊规则：优先使用 AkShare 适配器
+        # LongBridge CLI 对于 A股财务数据字段不完整
+        if market == "A":
+            for adapter in adapters:
+                if adapter.adapter_name == "akshare" and adapter.is_available():
+                    return adapter
+
         # 返回优先级最高的适配器
         for adapter in adapters:
             if adapter.is_available():
