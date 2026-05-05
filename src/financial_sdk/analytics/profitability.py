@@ -444,6 +444,17 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
                         interest_bearing_debt = 0
                     interest_bearing_debt += val
 
+            # 也尝试中文字段名
+            for debt_field in [
+                "资本租赁债务(流动)",
+                "资本租赁债务(非流动)",
+            ]:
+                val = self._get_value(balance, debt_field)
+                if val is not None and val > 0:
+                    if interest_bearing_debt is None:
+                        interest_bearing_debt = 0
+                    interest_bearing_debt += val
+
             # 如果没有找到带息债务，尝试heuristic
             if interest_bearing_debt is None and total_liabilities is not None:
                 accounts_payable = self._get_value(balance, "accounts_payable") or 0
