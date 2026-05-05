@@ -11,6 +11,7 @@
 - **缓存机制**: LRU 缓存 + TTL 过期策略
 - **监控统计**: P50/P90/P99 延迟统计、适配器健康状态
 - **财务分析**: 估值、盈利、效率、成长、安全五大维度分析
+- **高级分析**: Piotroski F-Score、自由现金流(FCF)、内在价值(Graham Number/DCF)
 
 ## 支持的数据
 
@@ -163,7 +164,17 @@ bundle = f.get_financial_data("0700.HK", "all", "annual", force_refresh=True)
 ### 财务分析
 
 ```python
-from financial_sdk.analytics import FinancialAnalytics
+from financial_sdk.analytics import (
+    FinancialAnalytics,      # 统一入口
+    ValuationAnalyzer,       # 估值分析
+    ProfitabilityAnalyzer,   # 盈利能力
+    EfficiencyAnalyzer,      # 运营效率
+    GrowthAnalyzer,          # 成长性
+    SafetyAnalyzer,          # 财务安全
+    PiotroskiAnalyzer,       # Piotroski F-Score
+    FCFAnalyzer,             # 自由现金流
+    IntrinsicValueAnalyzer,  # 内在价值
+)
 
 analytics = FinancialAnalytics()
 
@@ -179,6 +190,27 @@ metrics = analytics.get_profitability("0700.HK")   # 盈利能力
 metrics = analytics.get_efficiency("0700.HK")       # 运营效率
 metrics = analytics.get_growth("0700.HK")           # 成长性
 metrics = analytics.get_safety("0700.HK")          # 财务安全
+
+# 高级分析器（直接使用）
+from financial_sdk.analytics import PiotroskiAnalyzer, FCFAnalyzer, IntrinsicValueAnalyzer
+
+# Piotroski F-Score (0-9, 评估财务健康度)
+piotroski = PiotroskiAnalyzer()
+result = piotroski.analyze("600519.SH")
+print(f"F-Score: {result.f_score}/9")  # 如 7/9
+
+# 自由现金流分析
+fcf = FCFAnalyzer()
+result = fcf.analyze("600519.SH")
+print(f"FCF: {result.fcf/1e8:.2f}亿")
+print(f"FCF Yield: {result.fcf_yield*100:.2f}%")
+
+# 内在价值估算 (Graham Number + DCF)
+intrinsic = IntrinsicValueAnalyzer()
+result = intrinsic.analyze("600519.SH")
+print(f"Graham Number: {result.graham_number:.2f}")
+print(f"安全边际: {result.margin_of_safety*100:.1f}%")
+print(f"估值信号: {result.valuation_signal}")
 ```
 
 ### 健康检查与缓存
@@ -241,6 +273,8 @@ bundle.warnings        # 警告信息列表
 
 ### 分析维度
 
+#### 基础分析 (五维度)
+
 | 维度 | 方法 | 指标 |
 |------|------|------|
 | 估值 | `get_valuation()` | PE、PB、PS、PEG、EV/EBITDA、市值 |
@@ -248,6 +282,14 @@ bundle.warnings        # 警告信息列表
 | 效率 | `get_efficiency()` | DIO、DSO、DPO、营业周期、现金周转周期 |
 | 成长 | `get_growth()` | YoY/QoQ增长率、可持续增长率 |
 | 安全 | `get_safety()` | Altman Z-Score、流动比率、偿债能力 |
+
+#### 高级分析
+
+| 分析器 | 用途 | 关键指标 |
+|--------|------|----------|
+| `PiotroskiAnalyzer` | 财务健康度评分 | F-Score (0-9), 盈利/杠杆/效率评分 |
+| `FCFAnalyzer` | 自由现金流分析 | FCF, FCF Yield, 利润质量, CAGR |
+| `IntrinsicValueAnalyzer` | 内在价值估算 | Graham Number, DCF, 安全边际, 估值信号 |
 
 ## 项目结构
 
@@ -271,6 +313,9 @@ financial-sdk/
 │   │   ├── efficiency.py       # 运营效率分析器
 │   │   ├── growth.py           # 成长性分析器
 │   │   ├── safety.py           # 财务安全分析器
+│   │   ├── piotroski.py        # Piotroski F-Score 分析器
+│   │   ├── fcf.py              # 自由现金流分析器
+│   │   ├── intrinsic_value.py  # 内在价值分析器
 │   │   └── unified.py          # 统一分析入口
 │   ├── price/                  # 价格获取模块
 │   │   ├── price_models.py     # 价格数据模型
