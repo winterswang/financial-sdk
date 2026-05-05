@@ -12,6 +12,80 @@ from .analytics_base import BaseAnalyzer
 from ..price import PriceProvider, get_price_provider
 
 
+def _get_current_ratio_from_akshare(stock_code: str) -> Optional[float]:
+    """
+    从 AkShare 直接获取流动比率（用于港股/美股 fallback）
+
+    Args:
+        stock_code: 股票代码
+
+    Returns:
+        流动比率或 None
+    """
+    try:
+        import akshare as ak
+
+        # 港股
+        if stock_code.endswith('.HK'):
+            # AkShare 需要 5 位代码，前导补零
+            code = stock_code.replace('.HK', '').zfill(5)
+            df = ak.stock_financial_hk_analysis_indicator_em(symbol=code)
+            if df is not None and not df.empty and 'CURRENT_RATIO' in df.columns:
+                val = df['CURRENT_RATIO'].dropna().values
+                if len(val) > 0:
+                    return float(val[0])
+
+        # 美股
+        elif not ('.SH' in stock_code or '.SZ' in stock_code):
+            df = ak.stock_financial_us_analysis_indicator_em(symbol=stock_code)
+            if df is not None and not df.empty and 'CURRENT_RATIO' in df.columns:
+                val = df['CURRENT_RATIO'].dropna().values
+                if len(val) > 0:
+                    return float(val[0])
+
+    except Exception:
+        pass
+
+    return None
+
+
+def _get_quick_ratio_from_akshare(stock_code: str) -> Optional[float]:
+    """
+    从 AkShare 直接获取速动比率（用于港股/美股 fallback）
+
+    Args:
+        stock_code: 股票代码
+
+    Returns:
+        速动比率或 None
+    """
+    try:
+        import akshare as ak
+
+        # 港股
+        if stock_code.endswith('.HK'):
+            # AkShare 需要 5 位代码，前导补零
+            code = stock_code.replace('.HK', '').zfill(5)
+            df = ak.stock_financial_hk_analysis_indicator_em(symbol=code)
+            if df is not None and not df.empty and 'SPEED_RATIO' in df.columns:
+                val = df['SPEED_RATIO'].dropna().values
+                if len(val) > 0:
+                    return float(val[0])
+
+        # 美股
+        elif not ('.SH' in stock_code or '.SZ' in stock_code):
+            df = ak.stock_financial_us_analysis_indicator_em(symbol=stock_code)
+            if df is not None and not df.empty and 'SPEED_RATIO' in df.columns:
+                val = df['SPEED_RATIO'].dropna().values
+                if len(val) > 0:
+                    return float(val[0])
+
+    except Exception:
+        pass
+
+    return None
+
+
 @dataclass
 class SafetyMetrics:
     """
@@ -206,12 +280,32 @@ class SafetyAnalyzer(BaseAnalyzer):
             working_capital = current_assets - current_liabilities
 
         # 计算流动性指标
+        # 优先从资产负债表计算，否则从指标数据获取（A-share/AkShare提供）
         current_ratio = self._calculator.calculate_current_ratio(
             current_assets, current_liabilities
         )
+        if current_ratio is None and indicators is not None and not indicators.empty:
+            # 从 AkShare 的财务指标中获取 CURRENT_RATIO
+            cr = self._get_value(indicators, "current_ratio")
+            if cr is not None and cr > 0:
+                current_ratio = cr
+
+        # 如果仍未获取到，尝试从 AkShare 直接获取（港股/美股）
+        if current_ratio is None:
+            current_ratio = _get_current_ratio_from_akshare(stock_code)
+
         quick_ratio = self._calculator.calculate_quick_ratio(
             current_assets, inventory, current_liabilities
         )
+        if quick_ratio is None and indicators is not None and not indicators.empty:
+            # 从 AkShare 的财务指标中获取 SPEED_RATIO (速动比率)
+            qr = self._get_value(indicators, "speed_ratio")
+            if qr is not None and qr > 0:
+                quick_ratio = qr
+
+        # 如果仍未获取到，尝试从 AkShare 直接获取（港股/美股）
+        if quick_ratio is None:
+            quick_ratio = _get_quick_ratio_from_akshare(stock_code)
         cash_ratio = None
         if (
             cash is not None
