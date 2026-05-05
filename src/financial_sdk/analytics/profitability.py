@@ -187,6 +187,10 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
         net_profit = self._get_value(income, "net_profit")
         total_assets = self._get_value(balance, "total_assets")
         total_equity = self._get_value(balance, "total_equity")
+        total_liabilities = self._get_value(balance, "total_liabilities")
+        cash = self._get_value(balance, "cash_and_equivalents")
+        if cash is None:
+            cash = self._get_value(balance, "cash_and_short_term_deposits")
 
         # 利息费用 (用于 ROIC)
         interest_expense = self._get_value(income, "interest_expense")
@@ -215,13 +219,51 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
                 if tax_expense and profit_before_tax and profit_before_tax > 0:
                     tax_rate = min(tax_expense / profit_before_tax, 0.50)
 
-            total_liabilities = self._get_value(balance, "total_liabilities")
-            cash = self._get_value(balance, "cash_and_equivalents")
+            # ROIC 计算: 需要找到带息债务 (interest-bearing debt)
+            # 不使用 total_liabilities，因为其中包含应付账款等非带息负债
+            interest_bearing_debt = None
+
+            # 优先尝试获取带息债务字段
+            for debt_field in [
+                "long_term_debt",
+                "short_term_debt",
+                "bonds_payable",
+                "lease_liabilities",
+                "capital_lease",
+                "long_term_borrowings",
+                "short_term_borrowings",
+            ]:
+                val = self._get_value(balance, debt_field)
+                if val is not None and val > 0:
+                    if interest_bearing_debt is None:
+                        interest_bearing_debt = 0
+                    interest_bearing_debt += val
+
+            # 如果没有找到带息债务，尝试heuristic:
+            # 对于科技/互联网公司，债务通常很少，可以用 total_liabilities 作为近似
+            # 但要排除主要的非带息负债类别 (accounts_payable, customer_deposits, deferred_revenue)
+            if interest_bearing_debt is None and total_liabilities is not None:
+                # 估算: 总负债 - 主要非带息负债
+                accounts_payable = self._get_value(balance, "accounts_payable") or 0
+                customer_deposits = 0
+                for field in ["customer_deposits", "customer_deposits_and_placements", "客户存款及垫款"]:
+                    val = self._get_value(balance, field)
+                    if val:
+                        customer_deposits = val
+                        break
+                deferred_revenue = 0
+                for field in ["deferred_revenue", "advance_from_customers", "预收及预提费用"]:
+                    val = self._get_value(balance, field)
+                    if val:
+                        deferred_revenue = val
+                        break
+
+                interest_bearing_debt = max(0, total_liabilities - accounts_payable - customer_deposits - deferred_revenue)
 
             roic = self._calculator.calculate_roic(
                 ebit=operating_profit,
                 tax_rate=tax_rate,
-                total_debt=total_liabilities,
+                total_debt=interest_bearing_debt if interest_bearing_debt else 0,
                 cash=cash,
                 total_equity=total_equity,
             )
@@ -368,6 +410,10 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
             net_profit = self._get_value(income, "net_profit")
             total_assets = self._get_value(balance, "total_assets")
             total_equity = self._get_value(balance, "total_equity")
+            total_liabilities = self._get_value(balance, "total_liabilities")
+            cash = self._get_value(balance, "cash_and_equivalents")
+            if cash is None:
+                cash = self._get_value(balance, "cash_and_short_term_deposits")
 
             # 计算基础利润率
             gross_margin = self._calculator.calculate_gross_margin(gross_profit, revenue)
@@ -380,19 +426,58 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
             roe = self._calculator.calculate_dupont_roe(net_profit, total_equity)
             roa = self._calculator.calculate_dupont_roa(net_profit, total_assets)
 
-            # ROIC 计算
-            roic = None
-            if operating_profit is not None:
-                tax_rate = 0.25
-                total_liabilities = self._get_value(balance, "total_liabilities")
-                cash = self._get_value(balance, "cash_and_equivalents")
-                roic = self._calculator.calculate_roic(
-                    ebit=operating_profit,
-                    tax_rate=tax_rate,
-                    total_debt=total_liabilities,
-                    cash=cash,
-                    total_equity=total_equity,
-                )
+            # ROIC 计算: 需要找到带息债务 (interest-bearing debt)
+            # 不使用 total_liabilities，因为其中包含应付账款等非带息负债
+            interest_bearing_debt = None
+            for debt_field in [
+                "long_term_debt",
+                "short_term_debt",
+                "bonds_payable",
+                "lease_liabilities",
+                "capital_lease",
+                "long_term_borrowings",
+                "short_term_borrowings",
+            ]:
+                val = self._get_value(balance, debt_field)
+                if val is not None and val > 0:
+                    if interest_bearing_debt is None:
+                        interest_bearing_debt = 0
+                    interest_bearing_debt += val
+
+            # 如果没有找到带息债务，尝试heuristic
+            if interest_bearing_debt is None and total_liabilities is not None:
+                accounts_payable = self._get_value(balance, "accounts_payable") or 0
+                customer_deposits = 0
+                for field in ["customer_deposits", "customer_deposits_and_placements", "客户存款及垫款"]:
+                    val = self._get_value(balance, field)
+                    if val:
+                        customer_deposits = val
+                        break
+                deferred_revenue = 0
+                for field in ["deferred_revenue", "advance_from_customers", "预收及预提费用"]:
+                    val = self._get_value(balance, field)
+                    if val:
+                        deferred_revenue = val
+                        break
+                interest_bearing_debt = max(0, total_liabilities - accounts_payable - customer_deposits - deferred_revenue)
+
+            if cash is None:
+                cash = self._get_value(balance, "cash_and_short_term_deposits")
+
+            tax_rate = 0.25  # 默认税率
+            if net_profit is not None and revenue is not None and revenue > 0:
+                tax_expense = self._get_value(income, "tax_expense")
+                profit_before_tax = self._get_value(income, "profit_before_tax")
+                if tax_expense and profit_before_tax and profit_before_tax > 0:
+                    tax_rate = min(tax_expense / profit_before_tax, 0.50)
+
+            roic = self._calculator.calculate_roic(
+                ebit=operating_profit,
+                tax_rate=tax_rate,
+                total_debt=interest_bearing_debt if interest_bearing_debt else 0,
+                cash=cash,
+                total_equity=total_equity,
+            )
 
             # DuPont 分解
             dupont = self._calculator.calculate_dupont_decomposition(
