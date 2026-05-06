@@ -96,7 +96,8 @@ class FinancialCache:
 
     @staticmethod
     def make_cache_key(
-        market: str, stock_code: str, report_type: str, period: str
+        market: str, stock_code: str, report_type: str, period: str,
+        source: str = ""
     ) -> str:
         """
         生成缓存键
@@ -106,11 +107,15 @@ class FinancialCache:
             stock_code: 股票代码
             report_type: 报表类型 (balance_sheet, income_statement, cash_flow, indicators, all)
             period: 报告期类型 (annual, quarterly)
+            source: 数据源标识 (可选，区分不同适配器)
 
         Returns:
-            str: 缓存键，格式: {market}_{stock_code}_{report_type}_{period}
+            str: 缓存键，格式: {market}_{stock_code}_{report_type}_{period}_{source}
         """
-        return f"{market}_{stock_code}_{report_type}_{period}"
+        key = f"{market}_{stock_code}_{report_type}_{period}"
+        if source:
+            key += f"_{source}"
+        return key
 
     def get(self, key: str) -> Tuple[bool, Optional[Any]]:
         """

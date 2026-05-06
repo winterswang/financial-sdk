@@ -14,8 +14,21 @@ from ..price import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)
 
-# 缓存汇率，避免重复调用
-_exchange_rate_cache: Dict[str, float] = {}
+# 缓存汇率，避免重复调用（带TTL过期）
+from datetime import datetime as _dt
+
+_exchange_rate_cache: Dict[str, tuple] = {}  # key -> (rate, timestamp)
+_EXCHANGE_RATE_TTL_SECONDS = 24 * 60 * 60  # 24小时过期
+
+# Fallback 汇率及其标注日期
+_FALLBACK_RATES: Dict[str, tuple] = {
+    "CNY_USD": (0.138, "2026-04"),
+    "USD_CNY": (7.24, "2026-04"),
+    "HKD_USD": (0.128, "2026-04"),
+    "USD_HKD": (7.81, "2026-04"),
+    "CNY_HKD": (1.085, "2026-04"),
+    "HKD_CNY": (0.922, "2026-04"),
+}
 
 
 @dataclass
@@ -378,7 +391,7 @@ class ValuationAnalyzer(BaseAnalyzer):
 
     def _get_exchange_rate(self, from_currency: str, to_currency: str) -> Optional[float]:
         """
-        获取汇率
+        获取汇率（带TTL缓存）
 
         Args:
             from_currency: 源货币
@@ -391,8 +404,13 @@ class ValuationAnalyzer(BaseAnalyzer):
             return 1.0
 
         cache_key = f"{from_currency}_{to_currency}"
+        now = _dt.now()
+
+        # 检查缓存是否命中且未过期
         if cache_key in _exchange_rate_cache:
-            return _exchange_rate_cache[cache_key]
+            rate, ts = _exchange_rate_cache[cache_key]
+            if (now - ts).total_seconds() < _EXCHANGE_RATE_TTL_SECONDS:
+                return rate
 
         try:
             import akshare as ak
@@ -414,29 +432,26 @@ class ValuationAnalyzer(BaseAnalyzer):
                 }
                 rate = rates.get(cache_key)
                 if rate:
-                    _exchange_rate_cache[cache_key] = rate
+                    _exchange_rate_cache[cache_key] = (rate, now)
                     # 缓存反向
                     reverse_key = f"{to_currency}_{from_currency}"
                     reverse_rate = rates.get(reverse_key)
                     if reverse_rate:
-                        _exchange_rate_cache[reverse_key] = reverse_rate
+                        _exchange_rate_cache[reverse_key] = (reverse_rate, now)
                     return rate
         except Exception as e:
             logger.warning(f"Failed to get exchange rate {from_currency}->{to_currency}: {e}")
 
-        # 硬编码的备用汇率
-        fallback_rates = {
-            "CNY_USD": 0.138,   # 1 CNY ≈ 0.138 USD
-            "USD_CNY": 7.24,    # 1 USD ≈ 7.24 CNY
-            "HKD_USD": 0.128,   # 1 HKD ≈ 0.128 USD
-            "USD_HKD": 7.81,    # 1 USD ≈ 7.81 HKD
-            "CNY_HKD": 1.085,   # 1 CNY ≈ 1.085 HKD
-            "HKD_CNY": 0.922,   # 1 HKD ≈ 0.922 CNY
-        }
-        rate = fallback_rates.get(cache_key)
-        if rate:
-            _exchange_rate_cache[cache_key] = rate
-        return rate
+        # 备用汇率（带标注日期）
+        entry = _FALLBACK_RATES.get(cache_key)
+        if entry:
+            rate, date_str = entry
+            logger.warning(
+                f"使用备用汇率 {cache_key}={rate} (数据日期: {date_str})"
+            )
+            _exchange_rate_cache[cache_key] = (rate, now)
+            return rate
+        return None
 
     def _get_yoy_growth(self, stock_code: str, field: str) -> Optional[float]:
         """

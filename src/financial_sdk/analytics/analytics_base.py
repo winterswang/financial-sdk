@@ -4,6 +4,7 @@
 提供财务分析器的通用基类和接口定义。
 """
 
+import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -12,6 +13,8 @@ import pandas as pd
 
 from ..facade import FinancialFacade
 from .metrics_calculator import MetricsCalculator
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAnalyzer(ABC):
@@ -87,14 +90,20 @@ class BaseAnalyzer(ABC):
         Args:
             df: DataFrame
             field: 字段名
-            period_index: 取第几期 (0=最新)
+            period_index: 取第几期 (0=最新, 1=上一期)
 
         Returns:
             值或 None
         """
         if df is None or df.empty:
+            logger.debug(f"[{self.analyzer_name}] _get_value('{field}'): DataFrame 为空")
             return None
         if field not in df.columns:
+            available = sorted(df.columns.tolist())
+            logger.warning(
+                f"[{self.analyzer_name}] 字段 '{field}' 不存在于 DataFrame, "
+                f"可用列: {available[:20]}{'...' if len(available) > 20 else ''}"
+            )
             return None
 
         # 按日期排序确保获取正确的数据
@@ -105,6 +114,7 @@ class BaseAnalyzer(ABC):
 
         values = df_sorted[field].dropna()
         if values.empty:
+            logger.debug(f"[{self.analyzer_name}] _get_value('{field}'): 字段存在但值为空")
             return None
 
         if period_index < len(values):

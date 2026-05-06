@@ -161,7 +161,7 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
         return "profitability_analyzer"
 
     def get_profitability_metrics(
-        self, stock_code: str, period: str = "annual"
+        self, stock_code: str, period: str = "annual", *, _facade_override: Any = None
     ) -> Optional[ProfitabilityMetrics]:
         """
         获取完整盈利能力指标
@@ -173,7 +173,14 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
         Returns:
             ProfitabilityMetrics 或 None
         """
-        fs_data = self._get_financial_data(stock_code, period)
+        if _facade_override:
+            try:
+                bundle = _facade_override.get_financial_data(stock_code=stock_code, report_type="all", period=period)
+                fs_data = {"income_statement": bundle.income_statement, "balance_sheet": bundle.balance_sheet, "cash_flow": bundle.cash_flow, "indicators": bundle.indicators}
+            except Exception:
+                return None
+        else:
+            fs_data = self._get_financial_data(stock_code, period)
         income = fs_data["income_statement"]
         balance = fs_data["balance_sheet"]
 

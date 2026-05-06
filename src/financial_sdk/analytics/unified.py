@@ -90,16 +90,19 @@ class FullAnalysisReport:
         """
         计算综合评分 (0-100)
 
-        基于各维度指标计算综合评分。
-        仅作为参考。
+        基于各维度指标计算综合评分。仅作为参考。
+        维度缺失每个扣10分；负面指标（低ROE、负增长、低Z-Score）额外扣分。
 
         Returns:
             综合评分
         """
         score = 50.0  # 基础分
+        available_dims = sum(1 for m in [self.valuation, self.profitability, self.efficiency, self.growth, self.safety] if m is not None)
+        missing_dims = 5 - available_dims
+        score -= missing_dims * 10  # 维度缺失惩罚
 
-        # ROE 评分 (最高 +20)
-        if self.profitability and self.profitability.roe:
+        # ROE 评分 (最高 +20, 最低 -10)
+        if self.profitability and self.profitability.roe is not None:
             roe = self.profitability.roe
             if roe > 0.20:
                 score += 20
@@ -109,9 +112,11 @@ class FullAnalysisReport:
                 score += 10
             elif roe > 0.05:
                 score += 5
+            elif roe < 0:
+                score -= 10  # 负ROE扣分
 
-        # 成长性评分 (最高 +15)
-        if self.growth and self.growth.revenue_growth_yoy:
+        # 成长性评分 (最高 +15, 最低 -10)
+        if self.growth and self.growth.revenue_growth_yoy is not None:
             growth = self.growth.revenue_growth_yoy
             if growth > 0.30:
                 score += 15
@@ -119,14 +124,20 @@ class FullAnalysisReport:
                 score += 10
             elif growth > 0:
                 score += 5
+            elif growth < -0.10:
+                score -= 10  # 大幅负增长扣分
+            elif growth < 0:
+                score -= 5   # 轻微负增长扣分
 
-        # 安全性评分 (最高 +15)
-        if self.safety and self.safety.altman_z_score:
+        # 安全性评分 (最高 +15, 最低 -10)
+        if self.safety and self.safety.altman_z_score is not None:
             z = self.safety.altman_z_score
             if z > 2.99:
                 score += 15
             elif z > 1.81:
                 score += 10
+            elif z < 1.81:
+                score -= 10  # 危险区Z-Score扣分
 
         return min(100.0, max(0.0, score))
 
