@@ -117,7 +117,7 @@ class FinancialFacade:
         # 确定市场
         market = self._adapter_manager.get_market_for_stock(stock_code)
 
-        # 生成缓存键
+        # 生成缓存键（不含数据源，因为缓存应在适配器选择前检查）
         cache_key = FinancialCache.make_cache_key(
             market, stock_code, report_type, period
         )

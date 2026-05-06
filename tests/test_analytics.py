@@ -690,8 +690,8 @@ class TestFinancialAnalytics:
             ),
         )
 
-        # 基础分50 + ROE20 + 成长15 + 安全15 = 100
-        assert report.get_score() == 100.0
+        # 基础分50 + ROE20 + 成长15 + 安全15 - 维度缺失20(2个) = 80
+        assert report.get_score() == 80.0
 
     def test_get_summary(self):
         """测试获取分析摘要"""

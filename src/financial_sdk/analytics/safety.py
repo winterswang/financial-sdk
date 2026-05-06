@@ -229,7 +229,7 @@ class SafetyAnalyzer(BaseAnalyzer):
         return "safety_analyzer"
 
     def get_safety_metrics(
-        self, stock_code: str, period: str = "annual"
+        self, stock_code: str, period: str = "annual", *, _facade_override: Any = None
     ) -> Optional[SafetyMetrics]:
         """
         获取完整财务安全指标
@@ -241,7 +241,14 @@ class SafetyAnalyzer(BaseAnalyzer):
         Returns:
             SafetyMetrics 或 None
         """
-        fs_data = self._get_financial_data(stock_code, period)
+        if _facade_override:
+            try:
+                bundle = _facade_override.get_financial_data(stock_code=stock_code, report_type="all", period=period)
+                fs_data = {"income_statement": bundle.income_statement, "balance_sheet": bundle.balance_sheet, "cash_flow": bundle.cash_flow, "indicators": bundle.indicators}
+            except Exception:
+                return None
+        else:
+            fs_data = self._get_financial_data(stock_code, period)
         income = fs_data["income_statement"]
         balance = fs_data["balance_sheet"]
         indicators = fs_data["indicators"]
@@ -465,6 +472,12 @@ class SafetyAnalyzer(BaseAnalyzer):
         self, stock_code: str, facade: Any
     ) -> Optional[SafetyMetrics]:
         """使用指定门面获取财务安全指标（用于多年分析）"""
+        return self.get_safety_metrics(stock_code, _facade_override=facade)
+
+    def _get_metrics_with_facade_original(
+        self, stock_code: str, facade: Any
+    ) -> Optional[SafetyMetrics]:
+        """[DEPRECATED] 使用指定门面获取财务安全指标（用于多年分析）"""
         try:
             bundle = facade.get_financial_data(
                 stock_code=stock_code,
