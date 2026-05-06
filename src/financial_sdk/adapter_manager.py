@@ -165,6 +165,14 @@ class AdapterManager:
                 if adapter.adapter_name == "akshare" and adapter.is_available():
                     return adapter
 
+        # 美股特殊规则：优先使用 AkShare 适配器（东方财富）
+        # LongBridge CLI 对美股资产负债表字段严重不全（缺current_assets/liabilities,
+        # accounts_payable, short_term_debt, long_term_debt, retained_earnings等）
+        if market == "US":
+            for adapter in adapters:
+                if adapter.adapter_name == "akshare_us" and adapter.is_available():
+                    return adapter
+
         # 返回优先级最高的适配器
         for adapter in adapters:
             if adapter.is_available():
