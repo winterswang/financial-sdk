@@ -81,6 +81,7 @@ class USAdapter(BaseAdapter):
                     "长期负债": "long_term_debt",
                     "长期债务": "long_term_debt",
                     "现金及现金等价物": "cash_and_equivalents",
+                    "存款(流动)": "cash_and_equivalents",  # 部分美股(如NVO)现金记为存款
                     "短期投资": "short_term_investments",
                     "长期投资": "long_term_investments",
                     "应付票据(流动)": "notes_payable",
