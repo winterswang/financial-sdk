@@ -81,11 +81,15 @@ class USAdapter(BaseAdapter):
                     "长期负债": "long_term_debt",
                     "长期债务": "long_term_debt",
                     "现金及现金等价物": "cash_and_equivalents",
+                    "存款(流动)": "cash_and_equivalents",  # 部分美股(如NVO)现金记为存款
                     "短期投资": "short_term_investments",
                     "长期投资": "long_term_investments",
                     "应付票据(流动)": "notes_payable",
+                    "留存收益": "retained_earnings",
                     "其他流动资产": "other_current_assets",
                     "其他非流动资产": "other_non_current_assets",
+                    "递延收入(流动)": "deferred_revenue",
+                    "预收及预提费用": "advance_from_customers",
                 },
                 "income_statement": {
                     "REPORT_DATE": "report_date",
