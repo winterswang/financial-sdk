@@ -4,11 +4,18 @@
 提供基于财务报表的盈利能力分析，包括 DuPont 分解和 ROIC。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .analytics_base import BaseAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..facade import FinancialFacade  # noqa: F401
+
 
 
 @dataclass

@@ -1,10 +1,9 @@
 """测试 Piotroski F-Score 分析器"""
 
-import pytest
 from unittest.mock import MagicMock
 import pandas as pd
 
-from financial_sdk.analytics import PiotroskiAnalyzer, PiotroskiMetrics
+from financial_sdk.analytics import PiotroskiAnalyzer
 
 
 class TestPiotroskiAnalyzer:

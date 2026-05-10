@@ -345,6 +345,7 @@ class USAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "balance_sheet")
             df = self._map_fields(df, "balance_sheet")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "balance_sheet")
             return df
         except DataNotAvailableError:
             raise
@@ -387,6 +388,7 @@ class USAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "income_statement")
             df = self._map_fields(df, "income_statement")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "income_statement")
             return df
         except DataNotAvailableError:
             raise
@@ -427,6 +429,7 @@ class USAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "cash_flow")
             df = self._map_fields(df, "cash_flow")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "cash_flow")
             return df
         except DataNotAvailableError:
             raise
@@ -461,6 +464,7 @@ class USAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "indicators")
             df = self._map_fields(df, "indicators")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "indicators")
             return df
         except DataNotAvailableError:
             raise

@@ -4,6 +4,8 @@
 提供基于财务报表的成长性分析，包括同比增长率和可持续增长率。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -11,6 +13,11 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from .analytics_base import BaseAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..facade import FinancialFacade  # noqa: F401
+
 
 
 @dataclass
@@ -253,9 +260,8 @@ class GrowthAnalyzer(BaseAnalyzer):
                         # 计算留存比率 (简化: 1 - 分红率)
                         # 这里用净利润增长率作为留存收益的代理
                         # 实际应该用 (Net_Income - Dividends) / Net_Income
-                        retention_rate = 0.7  # 默认留存率 70%
-                        if profit_yoy is not None:
-                            retention_rate = max(0.3, min(0.9, 1 - abs(profit_yoy)))
+                        # 默认留存率 70%，后续可从分红数据推算
+                        retention_rate = 0.7
 
                         sustainable_growth = (
                             self._calculator.calculate_sustainable_growth_rate(
@@ -396,9 +402,8 @@ class GrowthAnalyzer(BaseAnalyzer):
                         roe = latest_net_profit / equity[-1] if equity[-1] != 0 else None
 
                 if roe is not None:
+                    # 默认留存率 70%，后续可从分红数据推算
                     retention_rate = 0.7
-                    if profit_yoy is not None:
-                        retention_rate = max(0.3, min(0.9, 1 - abs(profit_yoy)))
 
                     sustainable_growth = self._calculator.calculate_sustainable_growth_rate(
                         roe=roe,

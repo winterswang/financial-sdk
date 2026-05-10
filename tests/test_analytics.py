@@ -2,9 +2,7 @@
 财务分析模块单元测试
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock
 
 import pandas as pd
 
@@ -662,7 +660,7 @@ class TestFinancialAnalytics:
 
     def test_get_score(self):
         """测试综合评分计算"""
-        from src.financial_sdk.analytics import FinancialAnalytics, FullAnalysisReport
+        from src.financial_sdk.analytics import FullAnalysisReport
         from src.financial_sdk.analytics.profitability import ProfitabilityMetrics
         from src.financial_sdk.analytics.growth import GrowthMetrics
         from src.financial_sdk.analytics.safety import SafetyMetrics
@@ -695,7 +693,7 @@ class TestFinancialAnalytics:
 
     def test_get_summary(self):
         """测试获取分析摘要"""
-        from src.financial_sdk.analytics import FinancialAnalytics, FullAnalysisReport
+        from src.financial_sdk.analytics import FullAnalysisReport
         from src.financial_sdk.analytics.valuation import ValuationMetrics
         from src.financial_sdk.analytics.profitability import ProfitabilityMetrics
 

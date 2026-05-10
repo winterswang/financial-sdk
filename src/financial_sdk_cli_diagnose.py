@@ -122,7 +122,6 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
     gross_margin = get_value_from_df(indicators, "gross_margin")
     net_margin = get_value_from_df(indicators, "net_margin")
     current_ratio = get_value_from_df(indicators, "current_ratio")
-    quick_ratio = get_value_from_df(indicators, "quick_ratio")
     debt_to_assets = get_value_from_df(indicators, "debt_to_assets")
     dps = get_value_from_df(indicators, "dps")
 
@@ -257,7 +256,7 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
             metrics["pb_ratio"] = {
                 "formula": f"{current_price:.2f} / (总权益/股本)",
                 "numerator": current_price,
-                "denominator": calc_bvps,
+                "denominator": bvps,
                 "calculated": calc_pb,
                 "source_value": bvps,
                 "unit": "x",
@@ -459,7 +458,7 @@ def print_diagnosis(result: Dict[str, Any]) -> None:
                 print(f"    数据源原始值: {source_val:.4f}")
                 print(f"    差异: {diff:.4f}")
                 if diff < 0.01:
-                    print(f"    ✅ 验证通过")
+                    print("    ✅ 验证通过")
                 else:
                     print(f"    ⚠️ 存在差异 (差异 {diff:.2f})")
 

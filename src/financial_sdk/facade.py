@@ -66,9 +66,13 @@ class FinancialFacade:
             enable_cache: 是否启用缓存
         """
         self._adapter_manager = get_adapter_manager()
-        self._cache = (
-            get_cache() if enable_cache else FinancialCache(max_size=cache_size)
-        )
+        if enable_cache:
+            self._cache = get_cache()
+            # 同步缓存大小设置
+            if hasattr(self._cache, '_max_size') and self._cache._max_size < cache_size:
+                self._cache._max_size = cache_size
+        else:
+            self._cache = FinancialCache(max_size=cache_size)
         self._monitor = get_monitor()
         self._enable_cache = enable_cache
 
@@ -211,7 +215,46 @@ class FinancialFacade:
             )
             self._cache.set(cache_key, bundle, ttl)
 
+        # 内存保护：当同时拉取多个报表时检查数据量
+        if len(report_types_to_fetch) > 1:
+            self._check_bundle_memory(bundle, stock_code)
+
         return bundle
+
+    @staticmethod
+    def _check_bundle_memory(bundle: FinancialBundle, stock_code: str) -> None:
+        """
+        OOM 防护：检查 bundle 内存占用
+
+        当所有报表总行数超过阈值时，记录 warning 建议分批拉取。
+
+        Args:
+            bundle: 财务数据包
+            stock_code: 股票代码
+        """
+        import logging
+        logger = logging.getLogger(__name__)
+
+        total_rows = 0
+        for attr in ["balance_sheet", "income_statement", "cash_flow", "indicators"]:
+            df = getattr(bundle, attr, None)
+            if df is not None and not (hasattr(df, 'empty') and df.empty):
+                total_rows += len(df)
+
+        # 单报表超过 200 行 或 总计超过 500 行时警告
+        for attr in ["balance_sheet", "income_statement", "cash_flow", "indicators"]:
+            df = getattr(bundle, attr, None)
+            if df is not None and len(df) > 200:
+                logger.warning(
+                    f"OOM 风险: {stock_code} {attr} 返回 {len(df)} 行，"
+                    f"建议用 report_type='{attr}' 单独拉取以降低内存"
+                )
+
+        if total_rows > 500:
+            logger.warning(
+                f"OOM 风险: {stock_code} all reports 总计 {total_rows} 行，"
+                f"建议按 report_type 分批拉取或使用 max_years 限制年份"
+            )
 
     def _fetch_report(
         self, adapter, stock_code: str, report_type: str, period: str

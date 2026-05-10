@@ -456,34 +456,54 @@ class FinancialAnalytics:
         valuation = None
         try:
             valuation = self._valuation.get_valuation_metrics(stock_code, period)
-        except Exception:
+            if valuation is None:
+                failed_dims.append("valuation")
+                logger.warning(f"Stock {stock_code}: valuation returned None (data unavailable)")
+        except Exception as e:
             failed_dims.append("valuation")
+            logger.warning(f"Stock {stock_code}: valuation analysis failed: {e}")
 
         profitability = None
         try:
             profitability = self._profitability.get_profitability_metrics(
                 stock_code, period
             )
-        except Exception:
+            if profitability is None:
+                failed_dims.append("profitability")
+                logger.warning(f"Stock {stock_code}: profitability returned None (data unavailable)")
+        except Exception as e:
             failed_dims.append("profitability")
+            logger.warning(f"Stock {stock_code}: profitability analysis failed: {e}")
 
         efficiency = None
         try:
             efficiency = self._efficiency.get_efficiency_metrics(stock_code, period)
-        except Exception:
+            if efficiency is None:
+                failed_dims.append("efficiency")
+                logger.warning(f"Stock {stock_code}: efficiency returned None (data unavailable)")
+        except Exception as e:
             failed_dims.append("efficiency")
+            logger.warning(f"Stock {stock_code}: efficiency analysis failed: {e}")
 
         growth = None
         try:
             growth = self._growth.get_growth_metrics(stock_code, period)
-        except Exception:
+            if growth is None:
+                failed_dims.append("growth")
+                logger.warning(f"Stock {stock_code}: growth returned None (data unavailable)")
+        except Exception as e:
             failed_dims.append("growth")
+            logger.warning(f"Stock {stock_code}: growth analysis failed: {e}")
 
         safety = None
         try:
             safety = self._safety.get_safety_metrics(stock_code, period)
-        except Exception:
+            if safety is None:
+                failed_dims.append("safety")
+                logger.warning(f"Stock {stock_code}: safety returned None (data unavailable)")
+        except Exception as e:
             failed_dims.append("safety")
+            logger.warning(f"Stock {stock_code}: safety analysis failed: {e}")
 
         # 所有维度都失败时返回 None
         if all(
