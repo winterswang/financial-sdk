@@ -4,7 +4,6 @@ LongBridge 适配器单元测试
 使用 fixture 数据，不依赖网络。
 """
 
-import pytest
 
 from financial_sdk.adapters.longbridge_cli_adapter import LongbridgeCLIAdapter
 

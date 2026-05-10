@@ -20,7 +20,6 @@ from financial_sdk.exceptions import (
 def is_network_available():
     """检查网络是否可用"""
     import urllib.request
-
     try:
         urllib.request.urlopen("https://query1.finance.yahoo.com", timeout=5)
         return True
@@ -28,9 +27,21 @@ def is_network_available():
         return False
 
 
+def is_akshare_available():
+    """检查 AkShare 是否可用"""
+    try:
+        from importlib.util import find_spec
+        return find_spec("akshare") is not None
+    except ImportError:
+        return False
+
+
 # 标记需要网络连接的测试
 requires_network = pytest.mark.skipif(
     not is_network_available(), reason="网络不可用或API配额限制"
+)
+requires_akshare = pytest.mark.skipif(
+    not is_akshare_available(), reason="akshare 不可用"
 )
 
 
@@ -49,6 +60,7 @@ def facade_no_cache():
 class TestAShareIntegration:
     """A股集成测试"""
 
+    @requires_network
     def test_get_balance_sheet(self, facade):
         """测试获取A股资产负债表"""
         bundle = facade.get_financial_data("600000.SH", "balance_sheet", "annual")
@@ -57,12 +69,14 @@ class TestAShareIntegration:
         assert bundle.market == "A"
         assert bundle.currency == "CNY"
 
+    @requires_network
     def test_get_income_statement(self, facade):
         """测试获取A股利润表"""
         bundle = facade.get_financial_data("600000.SH", "income_statement", "annual")
         assert bundle.income_statement is not None
         assert not bundle.income_statement.empty
 
+    @requires_network
     def test_get_cash_flow(self, facade):
         """测试获取A股现金流量表"""
         bundle = facade.get_financial_data("600000.SH", "cash_flow", "annual")
@@ -84,6 +98,7 @@ class TestHKIntegration:
     """港股集成测试"""
 
     @pytest.mark.skip(reason="Yahoo Finance 返回空数据 (配额限制或网络问题)")
+    @requires_network
     def test_get_balance_sheet(self, facade):
         """测试获取港股资产负债表"""
         bundle = facade.get_financial_data("0700.HK", "balance_sheet", "annual")
@@ -106,6 +121,7 @@ class TestUSIntegration:
     """美股集成测试"""
 
     @pytest.mark.skip(reason="Yahoo Finance 返回空数据 (配额限制)")
+    @requires_network
     def test_get_balance_sheet(self, facade):
         """测试获取美股资产负债表"""
         bundle = facade.get_financial_data("AAPL", "balance_sheet", "annual")

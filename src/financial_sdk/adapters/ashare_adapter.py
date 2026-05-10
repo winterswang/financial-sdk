@@ -324,6 +324,7 @@ class ASHareAdapter(BaseAdapter):
             df = self._map_fields(df, "balance_sheet")
             df = self._standardize_date_column(df, "report_date")
             df = self._fill_balance_derived(df)
+            df = self._trim_unmapped_columns(df, "balance_sheet")
             return df
         except DataNotAvailableError:
             raise
@@ -372,6 +373,7 @@ class ASHareAdapter(BaseAdapter):
             df = self._map_fields(df, "income_statement")
             df = self._standardize_date_column(df, "report_date")
             df = self._fill_income_derived(df)
+            df = self._trim_unmapped_columns(df, "income_statement")
             return df
         except DataNotAvailableError:
             raise
@@ -417,6 +419,7 @@ class ASHareAdapter(BaseAdapter):
                 )
             df = self._map_fields(df, "cash_flow")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "cash_flow")
             return df
         except DataNotAvailableError:
             raise
@@ -465,6 +468,7 @@ class ASHareAdapter(BaseAdapter):
             df = self._pivot_indicators(df, period)
             df = self._map_fields(df, "indicators")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "indicators")
             return df
         except DataNotAvailableError:
             raise
@@ -602,6 +606,14 @@ class ASHareAdapter(BaseAdapter):
         if "net_profit" not in df.columns or df["net_profit"].isna().all():
             if "profit_before_tax" in df.columns:
                 df["net_profit"] = df["profit_before_tax"] * 0.75  # 假设25%税率
+
+        # 推算 net_margin = net_profit / revenue
+        if "net_margin" not in df.columns or df["net_margin"].isna().all():
+            if "net_profit" in df.columns and "revenue" in df.columns:
+                mask = df["revenue"] != 0
+                df.loc[mask, "net_margin"] = (
+                    df.loc[mask, "net_profit"] / df.loc[mask, "revenue"]
+                )
 
         return df
 

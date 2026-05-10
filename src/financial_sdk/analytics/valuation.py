@@ -4,18 +4,26 @@
 提供基于价格和财务数据的估值指标计算。
 """
 
+from __future__ import annotations
+
 import logging
 from dataclasses import dataclass
+from datetime import datetime as _dt
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .analytics_base import BaseAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..facade import FinancialFacade  # noqa: F401
+
 from ..price import PriceProvider, get_price_provider
 
 logger = logging.getLogger(__name__)
 
 # 缓存汇率，避免重复调用（带TTL过期）
-from datetime import datetime as _dt
+# _dt imported at top of file
 
 _exchange_rate_cache: Dict[str, tuple] = {}  # key -> (rate, timestamp)
 _EXCHANGE_RATE_TTL_SECONDS = 24 * 60 * 60  # 24小时过期
@@ -206,7 +214,6 @@ class ValuationAnalyzer(BaseAnalyzer):
         revenue = self._get_value(income, "revenue")
         net_profit = self._get_value(income, "net_profit")
         total_equity = self._get_value(balance, "total_equity")
-        total_assets = self._get_value(balance, "total_assets")
         total_debt = self._get_value(balance, "total_liabilities")
         cash = self._get_value(balance, "cash_and_equivalents")
         depreciation = self._get_value(cash_flow, "depreciation_amortization")

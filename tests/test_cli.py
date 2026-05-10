@@ -4,14 +4,11 @@ CLI 模块单元测试
 测试 CLI 输出格式化函数，不依赖实际 API 调用。
 """
 
-import pytest
-from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
 from src.financial_sdk_cli import (
     _format_number,
-    _format_dataframe_for_display,
     _filter_by_year,
     _parse_year_filter,
     _report_to_markdown,
@@ -23,9 +20,6 @@ from src.financial_sdk_cli import (
 from src.financial_sdk.analytics.unified import FullAnalysisReport
 from src.financial_sdk.analytics.valuation import ValuationMetrics
 from src.financial_sdk.analytics.profitability import ProfitabilityMetrics
-from src.financial_sdk.analytics.efficiency import EfficiencyMetrics
-from src.financial_sdk.analytics.growth import GrowthMetrics
-from src.financial_sdk.analytics.safety import SafetyMetrics
 
 
 class TestFormatNumber:

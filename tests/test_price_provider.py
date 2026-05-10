@@ -3,8 +3,7 @@
 """
 
 import pytest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+from unittest.mock import patch
 
 from src.financial_sdk.price import (
     PriceData,

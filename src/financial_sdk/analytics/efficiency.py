@@ -4,11 +4,18 @@
 提供基于财务报表的运营效率分析，包括营业周期和现金周转周期。
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 from .analytics_base import BaseAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..facade import FinancialFacade  # noqa: F401
+
 
 
 @dataclass

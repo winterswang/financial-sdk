@@ -397,6 +397,7 @@ class HKAdapter(BaseAdapter):
             df = self._map_fields(df, "balance_sheet")
             df = self._standardize_date_column(df, "report_date")
             df = self._fill_balance_derived(df)
+            df = self._trim_unmapped_columns(df, "balance_sheet")
             return df
         except DataNotAvailableError:
             raise
@@ -440,6 +441,7 @@ class HKAdapter(BaseAdapter):
             df = self._map_fields(df, "income_statement")
             df = self._standardize_date_column(df, "report_date")
             df = self._fill_income_derived(df)
+            df = self._trim_unmapped_columns(df, "income_statement")
             return df
         except DataNotAvailableError:
             raise
@@ -480,6 +482,7 @@ class HKAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "cash_flow")
             df = self._map_fields(df, "cash_flow")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "cash_flow")
             return df
         except DataNotAvailableError:
             raise
@@ -520,6 +523,7 @@ class HKAdapter(BaseAdapter):
             self._validate_not_empty(df, stock_code, "indicators")
             df = self._map_fields(df, "indicators")
             df = self._standardize_date_column(df, "report_date")
+            df = self._trim_unmapped_columns(df, "indicators")
             return df
         except DataNotAvailableError:
             raise
@@ -620,5 +624,13 @@ class HKAdapter(BaseAdapter):
             if "total_cost" not in df.columns or df["total_cost"].isna().all():
                 if "revenue" in df.columns and "gross_profit" in df.columns:
                     df["total_cost"] = df["revenue"] - df["gross_profit"]
+
+        # 推算 net_margin = net_profit / revenue
+        if "net_margin" not in df.columns or df["net_margin"].isna().all():
+            if "net_profit" in df.columns and "revenue" in df.columns:
+                mask = df["revenue"] != 0
+                df.loc[mask, "net_margin"] = (
+                    df.loc[mask, "net_profit"] / df.loc[mask, "revenue"]
+                )
 
         return df

@@ -13,6 +13,11 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from .analytics_base import BaseAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..facade import FinancialFacade  # noqa: F401
+
 
 
 @dataclass
@@ -505,8 +510,6 @@ class PiotroskiAnalyzer(BaseAnalyzer):
         # 7. 股数未增加（使用 equity_per_share 估算）
         curr_bvps = self._get_value_from_df(curr_balance, "bvps")
         prev_bvps = self._get_value_from_df(prev_balance, "bvps")
-        curr_equity = self._get_value_from_df(curr_balance, "total_equity")
-        prev_equity = self._get_value_from_df(prev_balance, "total_equity")
 
         # 如果 BVPS 提升，说明股数未增加（权益增加但股数不变）
         if curr_bvps is not None and prev_bvps is not None and prev_bvps > 0:

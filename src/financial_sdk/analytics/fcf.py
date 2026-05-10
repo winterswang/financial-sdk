@@ -8,6 +8,8 @@
 - 利润质量指标 (FCF/Net Income, Cash Earnings Ratio, Accrual Ratio)
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -15,6 +17,11 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from .analytics_base import BaseAnalyzer
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..facade import FinancialFacade  # noqa: F401
+
 from ..price import get_price_provider
 
 
@@ -269,8 +276,6 @@ class FCFAnalyzer(BaseAnalyzer):
             fcf_series: List[float] = []
             for date in dates[:10]:  # 最多取10年
                 period_cf = cash_flow[cash_flow["report_date"] == date]
-                period_inc = income[income["report_date"] == date]
-
                 period_ocf = self._get_value_from_df(period_cf, "operating_cash_flow")
                 period_capex = self._get_value_from_df(period_cf, "capex")
                 if period_capex is None:
