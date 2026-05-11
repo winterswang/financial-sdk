@@ -142,7 +142,9 @@ class IntrinsicValueMetrics:
         lines.append(f"估值信号: {self.valuation_signal}")
 
         if self.buy_range_low is not None and self.buy_range_high is not None:
-            lines.append(f"建议买入区间: {self._fmt(self.buy_range_low)} - {self._fmt(self.buy_range_high)}")
+            lines.append(
+                f"建议买入区间: {self._fmt(self.buy_range_low)} - {self._fmt(self.buy_range_high)}"
+            )
 
         if self.pe_percentile_5y is not None:
             lines.append(f"5年PE分位: {self._fmt_pct(self.pe_percentile_5y)}")
@@ -161,7 +163,7 @@ class IntrinsicValueMetrics:
     def _fmt_pct(val: Optional[float]) -> str:
         if val is None:
             return "N/A"
-        return f"{val*100:.1f}%"
+        return f"{val * 100:.1f}%"
 
 
 class IntrinsicValueAnalyzer(BaseAnalyzer):
@@ -372,7 +374,9 @@ class IntrinsicValueAnalyzer(BaseAnalyzer):
 
             if dcf_pessimistic is not None:
                 buy_range_high = buy_range_low
-                buy_range_low = min(buy_range_low or float("inf"), dcf_pessimistic * 0.7)
+                buy_range_low = min(
+                    buy_range_low or float("inf"), dcf_pessimistic * 0.7
+                )
 
             # === 历史估值分位 (简化版) ===
             pe_percentile_5y = None
@@ -449,7 +453,11 @@ class IntrinsicValueAnalyzer(BaseAnalyzer):
 
             # 永续价值
             fcf_final = fcf * (1 + growth_rate) ** growth_years
-            terminal_value = fcf_final * (1 + terminal_growth_rate) / (discount_rate - terminal_growth_rate)
+            terminal_value = (
+                fcf_final
+                * (1 + terminal_growth_rate)
+                / (discount_rate - terminal_growth_rate)
+            )
             pv_terminal = terminal_value / (1 + discount_rate) ** growth_years
 
             return pv_cash_flows + pv_terminal
@@ -487,7 +495,9 @@ class IntrinsicValueAnalyzer(BaseAnalyzer):
         result = self.analyze(stock_code, period)
         return result.margin_of_safety if result else None
 
-    def get_graham_number(self, stock_code: str, period: str = "annual") -> Optional[float]:
+    def get_graham_number(
+        self, stock_code: str, period: str = "annual"
+    ) -> Optional[float]:
         """
         获取 Graham Number
 

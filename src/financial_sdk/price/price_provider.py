@@ -312,7 +312,9 @@ class PriceProvider:
 
         return None
 
-    def _get_market_cap_from_longbridge_sdk(self, stock_code: str, market: str) -> Optional[float]:
+    def _get_market_cap_from_longbridge_sdk(
+        self, stock_code: str, market: str
+    ) -> Optional[float]:
         """
         从 Longbridge OpenAPI SDK 获取市值
 
@@ -364,9 +366,9 @@ class PriceProvider:
                             static_info = ctx.static_info([lb_symbol])
                             if static_info:
                                 info = static_info[0]
-                                total_shares = getattr(info, "total_shares", None) or getattr(
-                                    info, "outstanding_shares", None
-                                )
+                                total_shares = getattr(
+                                    info, "total_shares", None
+                                ) or getattr(info, "outstanding_shares", None)
                                 if total_shares and total_shares > 0:
                                     # 获取实时价格
                                     quotes = ctx.quote([lb_symbol])
@@ -413,7 +415,9 @@ class PriceProvider:
                         if token_dir.exists():
                             token_files = list(token_dir.iterdir())
                             if token_files:
-                                token_file = max(token_files, key=lambda p: p.stat().st_mtime)
+                                token_file = max(
+                                    token_files, key=lambda p: p.stat().st_mtime
+                                )
                                 with open(token_file, "r") as f:
                                     token_data = json.load(f)
                                 client_id = token_data.get("client_id", "")
@@ -425,12 +429,16 @@ class PriceProvider:
                                         access_token=access_token,
                                     )
                                     ctx = QuoteContext(config)
-                                    lb_symbol = self._to_longbridge_symbol(stock_code, market)
+                                    lb_symbol = self._to_longbridge_symbol(
+                                        stock_code, market
+                                    )
                                     if lb_symbol:
                                         static_info = ctx.static_info([lb_symbol])
                                         if static_info:
                                             info = static_info[0]
-                                            total_shares = getattr(info, "total_shares", None) or getattr(
+                                            total_shares = getattr(
+                                                info, "total_shares", None
+                                            ) or getattr(
                                                 info, "outstanding_shares", None
                                             )
                                             if total_shares and total_shares > 0:
@@ -439,7 +447,9 @@ class PriceProvider:
                                                     price = float(quotes[0].last_done)
                                                     return price * total_shares
                     except Exception as e2:
-                        logger.debug(f"Longbridge SDK retry failed for {stock_code}: {e2}")
+                        logger.debug(
+                            f"Longbridge SDK retry failed for {stock_code}: {e2}"
+                        )
             else:
                 logger.debug(f"Longbridge SDK market cap failed for {stock_code}: {e}")
 
@@ -533,7 +543,9 @@ class PriceProvider:
             logger.debug(f"Failed to refresh Longbridge token: {e}")
             return False
 
-    def _get_market_cap_from_eastmoney(self, stock_code: str, market: str) -> Optional[float]:
+    def _get_market_cap_from_eastmoney(
+        self, stock_code: str, market: str
+    ) -> Optional[float]:
         """
         从东方财富个股API获取市值
 
@@ -557,7 +569,9 @@ class PriceProvider:
                 for prefix in ["105", "106"]:
                     secid = f"{prefix}.{code}"
                     url = f"https://push2.eastmoney.com/api/qt/stock/get?secid={secid}&fields=f57,f116,f117"
-                    resp = session.request("GET", url, headers=YAHOO_HEADERS, timeout=10)
+                    resp = session.request(
+                        "GET", url, headers=YAHOO_HEADERS, timeout=10
+                    )
                     if resp.status == 200:
                         data = resp.json()
                         market_cap = data.get("data", {}).get("f116")
@@ -596,7 +610,9 @@ class PriceProvider:
 
         return None
 
-    def _get_market_cap_from_yahoo(self, stock_code: str, market: str) -> Optional[float]:
+    def _get_market_cap_from_yahoo(
+        self, stock_code: str, market: str
+    ) -> Optional[float]:
         """
         从 Yahoo Finance quoteSummary API 获取市值
 
@@ -636,7 +652,9 @@ class PriceProvider:
 
         return None
 
-    def _get_market_cap_from_longbridge_cli(self, stock_code: str, market: str) -> Optional[float]:
+    def _get_market_cap_from_longbridge_cli(
+        self, stock_code: str, market: str
+    ) -> Optional[float]:
         """
         从 LongBridge CLI static 命令获取市值
 
@@ -1028,7 +1046,9 @@ class PriceProvider:
                 market_cap = self._get_market_cap_from_eastmoney(stock_code, market)
                 if not market_cap:
                     # Longbridge SDK (含 total_shares)
-                    market_cap = self._get_market_cap_from_longbridge_sdk(stock_code, market)
+                    market_cap = self._get_market_cap_from_longbridge_sdk(
+                        stock_code, market
+                    )
                 if not market_cap:
                     # Yahoo quoteSummary
                     market_cap = self._get_market_cap_from_yahoo(stock_code, market)

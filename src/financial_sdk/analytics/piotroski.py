@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from ..facade import FinancialFacade  # noqa: F401
 
 
-
 @dataclass
 class PiotroskiDetail:
     """Piotroski 评分详情"""
@@ -287,7 +286,11 @@ class PiotroskiAnalyzer(BaseAnalyzer):
         # 5. 杠杆指标（单期无法判断变化）
         total_assets = self._get_value(balance, "total_assets")
         total_liabilities = self._get_value(balance, "total_liabilities")
-        if total_liabilities is not None and total_assets is not None and total_assets > 0:
+        if (
+            total_liabilities is not None
+            and total_assets is not None
+            and total_assets > 0
+        ):
             leverage_ratio = total_liabilities / total_assets
             if leverage_ratio < 0.5:  # 简单判断：负债率<50%
                 leverage_score += 1
@@ -391,14 +394,22 @@ class PiotroskiAnalyzer(BaseAnalyzer):
             # 尝试计算 ROA
             curr_net_profit_val = self._get_value_from_df(curr_income, "net_profit")
             curr_assets = self._get_value_from_df(curr_balance, "total_assets")
-            if curr_net_profit_val is not None and curr_assets is not None and curr_assets > 0:
+            if (
+                curr_net_profit_val is not None
+                and curr_assets is not None
+                and curr_assets > 0
+            ):
                 curr_roa = curr_net_profit_val / curr_assets
 
         prev_roa = self._get_value_from_df(prev_income, "roa")
         if prev_roa is None:
             prev_net_profit = self._get_value_from_df(prev_income, "net_profit")
             prev_assets = self._get_value_from_df(prev_balance, "total_assets")
-            if prev_net_profit is not None and prev_assets is not None and prev_assets > 0:
+            if (
+                prev_net_profit is not None
+                and prev_assets is not None
+                and prev_assets > 0
+            ):
                 prev_roa = prev_net_profit / prev_assets
 
         if curr_roa is not None and prev_roa is not None and curr_roa > prev_roa:
@@ -481,9 +492,17 @@ class PiotroskiAnalyzer(BaseAnalyzer):
         prev_current_assets = self._get_value_from_df(prev_balance, "current_assets")
         prev_current_liab = self._get_value_from_df(prev_balance, "current_liabilities")
 
-        if curr_current_assets is not None and curr_current_liab is not None and curr_current_liab > 0:
+        if (
+            curr_current_assets is not None
+            and curr_current_liab is not None
+            and curr_current_liab > 0
+        ):
             curr_current_ratio = curr_current_assets / curr_current_liab
-        if prev_current_assets is not None and prev_current_liab is not None and prev_current_liab > 0:
+        if (
+            prev_current_assets is not None
+            and prev_current_liab is not None
+            and prev_current_liab > 0
+        ):
             prev_current_ratio = prev_current_assets / prev_current_liab
 
         if curr_current_ratio is not None and prev_current_ratio is not None:

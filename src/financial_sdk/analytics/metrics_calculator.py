@@ -56,8 +56,10 @@ class MetricsCalculator:
 
     @staticmethod
     def calculate_ps_ratio(
-        price: float, revenue: Optional[float], shares: Optional[float],
-        market_cap: Optional[float] = None
+        price: float,
+        revenue: Optional[float],
+        shares: Optional[float],
+        market_cap: Optional[float] = None,
     ) -> Optional[float]:
         """
         计算市销率 (P/S Ratio)

@@ -226,9 +226,9 @@ def _transpose_for_display(
     # 格式化数字列
     for col in df.columns:
         df[col] = df[col].apply(
-            lambda x: _format_number(x)
-            if pd.notna(x) and isinstance(x, (int, float))
-            else x
+            lambda x: (
+                _format_number(x) if pd.notna(x) and isinstance(x, (int, float)) else x
+            )
         )
 
     return df
@@ -362,6 +362,7 @@ def cmd_cache(args):
     """缓存管理"""
     if args.clear:
         from financial_sdk.cache import clear_cache
+
         clear_cache()
         print("所有缓存已清除")
         return 0
@@ -787,7 +788,10 @@ def cmd_analyze(args):
                     data = metrics.to_dict()
                     print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
                 else:
-                    print(f"无法获取 {args.stock_code} 的估值数据: 需要 EPS/价格数据", file=sys.stderr)
+                    print(
+                        f"无法获取 {args.stock_code} 的估值数据: 需要 EPS/价格数据",
+                        file=sys.stderr,
+                    )
                     return 1
 
             elif dimension == "profitability":
@@ -797,7 +801,10 @@ def cmd_analyze(args):
                     data = metrics.to_dict()
                     print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
                 else:
-                    print(f"无法获取 {args.stock_code} 的盈利能力数据: 需要 revenue/net_profit/total_equity 等字段", file=sys.stderr)
+                    print(
+                        f"无法获取 {args.stock_code} 的盈利能力数据: 需要 revenue/net_profit/total_equity 等字段",
+                        file=sys.stderr,
+                    )
                     return 1
 
             elif dimension == "efficiency":
@@ -807,7 +814,10 @@ def cmd_analyze(args):
                     data = metrics.to_dict()
                     print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
                 else:
-                    print(f"无法获取 {args.stock_code} 的运营效率数据: 需要 inventory/accounts_receivable/accounts_payable 标准字段", file=sys.stderr)
+                    print(
+                        f"无法获取 {args.stock_code} 的运营效率数据: 需要 inventory/accounts_receivable/accounts_payable 标准字段",
+                        file=sys.stderr,
+                    )
                     return 1
 
             elif dimension == "growth":
@@ -817,7 +827,10 @@ def cmd_analyze(args):
                     data = metrics.to_dict()
                     print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
                 else:
-                    print(f"无法获取 {args.stock_code} 的成长性数据: 需要至少2期财务数据做 YoY 计算", file=sys.stderr)
+                    print(
+                        f"无法获取 {args.stock_code} 的成长性数据: 需要至少2期财务数据做 YoY 计算",
+                        file=sys.stderr,
+                    )
                     return 1
 
             elif dimension == "safety":
@@ -827,7 +840,10 @@ def cmd_analyze(args):
                     data = metrics.to_dict()
                     print(json.dumps(data, ensure_ascii=False, indent=2, default=str))
                 else:
-                    print(f"无法获取 {args.stock_code} 的财务安全数据: 需要 current_assets/current_liabilities/total_equity 等字段", file=sys.stderr)
+                    print(
+                        f"无法获取 {args.stock_code} 的财务安全数据: 需要 current_assets/current_liabilities/total_equity 等字段",
+                        file=sys.stderr,
+                    )
                     return 1
 
             else:
@@ -844,7 +860,9 @@ def cmd_analyze(args):
             if use_multi_year:
                 # 多年表格格式
                 multi_year_data = analytics.get_multi_year_metrics(
-                    args.stock_code, args.period, years=list(years_filter) if years_filter else None
+                    args.stock_code,
+                    args.period,
+                    years=list(years_filter) if years_filter else None,
                 )
                 if not multi_year_data or not multi_year_data.get("report_dates"):
                     # 多年数据不可用时，回退到单期报告
@@ -895,6 +913,7 @@ def cmd_analyze(args):
 
 # ===== Markdown / CSV 输出格式 =====
 
+
 def _format_market_cap(market_cap):
     """格式化市值显示"""
     if market_cap is None:
@@ -913,7 +932,9 @@ def _report_to_markdown(report) -> str:
     """将 FullAnalysisReport 转为 Markdown 表格"""
     lines = []
     lines.append(f"# 财务分析报告: {report.stock_code}")
-    lines.append(f"报告日期: {report.report_date} | 综合评分: {report.get_score():.1f}/100")
+    lines.append(
+        f"报告日期: {report.report_date} | 综合评分: {report.get_score():.1f}/100"
+    )
     lines.append("")
 
     def _add_dimension_table(title, rows):
@@ -927,14 +948,20 @@ def _report_to_markdown(report) -> str:
     # Valuation
     if report.valuation:
         v = report.valuation
-        _add_dimension_table("估值指标 Valuation", [
-            ("市盈率 (P/E)", f"{v.pe_ratio:.2f}" if v.pe_ratio else "-"),
-            ("市净率 (P/B)", f"{v.pb_ratio:.2f}" if v.pb_ratio else "-"),
-            ("市销率 (P/S)", f"{v.ps_ratio:.2f}" if v.ps_ratio else "-"),
-            ("总市值", _format_market_cap(v.market_cap) if v.market_cap else "-"),
-            ("股息率", f"{v.dividend_yield * 100:.2f}%" if v.dividend_yield else "-"),
-            ("EPS", f"{v.eps:.2f}" if v.eps else "-"),
-        ])
+        _add_dimension_table(
+            "估值指标 Valuation",
+            [
+                ("市盈率 (P/E)", f"{v.pe_ratio:.2f}" if v.pe_ratio else "-"),
+                ("市净率 (P/B)", f"{v.pb_ratio:.2f}" if v.pb_ratio else "-"),
+                ("市销率 (P/S)", f"{v.ps_ratio:.2f}" if v.ps_ratio else "-"),
+                ("总市值", _format_market_cap(v.market_cap) if v.market_cap else "-"),
+                (
+                    "股息率",
+                    f"{v.dividend_yield * 100:.2f}%" if v.dividend_yield else "-",
+                ),
+                ("EPS", f"{v.eps:.2f}" if v.eps else "-"),
+            ],
+        )
     else:
         lines.append("## 估值指标 Valuation")
         lines.append("⚠️ 数据不可用")
@@ -943,13 +970,16 @@ def _report_to_markdown(report) -> str:
     # Profitability
     if report.profitability:
         p = report.profitability
-        _add_dimension_table("盈利能力 Profitability", [
-            ("ROE", f"{p.roe * 100:.2f}%" if p.roe else "-"),
-            ("ROA", f"{p.roa * 100:.2f}%" if p.roa else "-"),
-            ("ROIC", f"{p.roic * 100:.2f}%" if p.roic else "-"),
-            ("毛利率", f"{p.gross_margin * 100:.2f}%" if p.gross_margin else "-"),
-            ("净利率", f"{p.net_margin * 100:.2f}%" if p.net_margin else "-"),
-        ])
+        _add_dimension_table(
+            "盈利能力 Profitability",
+            [
+                ("ROE", f"{p.roe * 100:.2f}%" if p.roe else "-"),
+                ("ROA", f"{p.roa * 100:.2f}%" if p.roa else "-"),
+                ("ROIC", f"{p.roic * 100:.2f}%" if p.roic else "-"),
+                ("毛利率", f"{p.gross_margin * 100:.2f}%" if p.gross_margin else "-"),
+                ("净利率", f"{p.net_margin * 100:.2f}%" if p.net_margin else "-"),
+            ],
+        )
     else:
         lines.append("## 盈利能力 Profitability")
         lines.append("⚠️ 数据不可用")
@@ -958,12 +988,20 @@ def _report_to_markdown(report) -> str:
     # Efficiency
     if report.efficiency:
         e = report.efficiency
-        _add_dimension_table("运营效率 Efficiency", [
-            ("现金周转周期", f"{e.cash_conversion_cycle:.1f} 天" if e.cash_conversion_cycle else "-"),
-            ("存货周转天数", f"{e.dio:.1f} 天" if e.dio else "-"),
-            ("应收账款周转天数", f"{e.dso:.1f} 天" if e.dso else "-"),
-            ("应付账款周转天数", f"{e.dpo:.1f} 天" if e.dpo else "-"),
-        ])
+        _add_dimension_table(
+            "运营效率 Efficiency",
+            [
+                (
+                    "现金周转周期",
+                    f"{e.cash_conversion_cycle:.1f} 天"
+                    if e.cash_conversion_cycle
+                    else "-",
+                ),
+                ("存货周转天数", f"{e.dio:.1f} 天" if e.dio else "-"),
+                ("应收账款周转天数", f"{e.dso:.1f} 天" if e.dso else "-"),
+                ("应付账款周转天数", f"{e.dpo:.1f} 天" if e.dpo else "-"),
+            ],
+        )
     else:
         lines.append("## 运营效率 Efficiency")
         lines.append("⚠️ 数据不可用")
@@ -972,11 +1010,27 @@ def _report_to_markdown(report) -> str:
     # Growth
     if report.growth:
         g = report.growth
-        _add_dimension_table("成长性 Growth", [
-            ("营收增长率", f"{g.revenue_growth_yoy * 100:.2f}%" if g.revenue_growth_yoy else "-"),
-            ("净利润增长率", f"{g.profit_growth_yoy * 100:.2f}%" if g.profit_growth_yoy else "-"),
-            ("可持续增长率", f"{g.sustainable_growth_rate * 100:.2f}%" if g.sustainable_growth_rate else "-"),
-        ])
+        _add_dimension_table(
+            "成长性 Growth",
+            [
+                (
+                    "营收增长率",
+                    f"{g.revenue_growth_yoy * 100:.2f}%"
+                    if g.revenue_growth_yoy
+                    else "-",
+                ),
+                (
+                    "净利润增长率",
+                    f"{g.profit_growth_yoy * 100:.2f}%" if g.profit_growth_yoy else "-",
+                ),
+                (
+                    "可持续增长率",
+                    f"{g.sustainable_growth_rate * 100:.2f}%"
+                    if g.sustainable_growth_rate
+                    else "-",
+                ),
+            ],
+        )
     else:
         lines.append("## 成长性 Growth")
         lines.append("⚠️ 数据不可用")
@@ -985,13 +1039,22 @@ def _report_to_markdown(report) -> str:
     # Safety
     if report.safety:
         s = report.safety
-        _add_dimension_table("财务安全 Safety", [
-            ("Altman Z-Score", f"{s.altman_z_score:.2f}" if s.altman_z_score else "-"),
-            ("流动比率", f"{s.current_ratio:.2f}" if s.current_ratio else "-"),
-            ("速动比率", f"{s.quick_ratio:.2f}" if s.quick_ratio else "-"),
-            ("利息保障倍数", f"{s.interest_coverage:.2f}x" if s.interest_coverage else "-"),
-            ("资产负债率", f"{s.debt_to_equity:.2f}" if s.debt_to_equity else "-"),
-        ])
+        _add_dimension_table(
+            "财务安全 Safety",
+            [
+                (
+                    "Altman Z-Score",
+                    f"{s.altman_z_score:.2f}" if s.altman_z_score else "-",
+                ),
+                ("流动比率", f"{s.current_ratio:.2f}" if s.current_ratio else "-"),
+                ("速动比率", f"{s.quick_ratio:.2f}" if s.quick_ratio else "-"),
+                (
+                    "利息保障倍数",
+                    f"{s.interest_coverage:.2f}x" if s.interest_coverage else "-",
+                ),
+                ("资产负债率", f"{s.debt_to_equity:.2f}" if s.debt_to_equity else "-"),
+            ],
+        )
     else:
         lines.append("## 财务安全 Safety")
         lines.append("⚠️ 数据不可用")
@@ -1049,6 +1112,7 @@ def _report_to_csv(report) -> str:
 
 # ===== Compare 子命令 =====
 
+
 def cmd_compare(args):
     """多股并列对比"""
     analytics = FinancialAnalytics()
@@ -1103,17 +1167,86 @@ def _compare_to_table(stock_codes, results) -> str:
 
     # 核心指标
     metrics = [
-        ("PE", lambda r: f"{r.valuation.pe_ratio:.1f}" if r.valuation and r.valuation.pe_ratio else "-"),
-        ("PB", lambda r: f"{r.valuation.pb_ratio:.2f}" if r.valuation and r.valuation.pb_ratio else "-"),
-        ("市值", lambda r: _format_market_cap(r.valuation.market_cap) if r.valuation and r.valuation.market_cap else "-"),
-        ("营收(亿)", lambda r: f"{_get_revenue(r) / 1e8:.1f}" if _get_revenue(r) else "-"),
-        ("净利润(亿)", lambda r: f"{_get_net_profit(r) / 1e8:.1f}" if _get_net_profit(r) else "-"),
-        ("毛利率", lambda r: f"{r.profitability.gross_margin * 100:.1f}%" if r.profitability and r.profitability.gross_margin else "-"),
-        ("净利率", lambda r: f"{r.profitability.net_margin * 100:.1f}%" if r.profitability and r.profitability.net_margin else "-"),
-        ("ROE", lambda r: f"{r.profitability.roe * 100:.1f}%" if r.profitability and r.profitability.roe else "-"),
-        ("营收增长", lambda r: f"{r.growth.revenue_growth_yoy * 100:.1f}%" if r.growth and r.growth.revenue_growth_yoy else "-"),
-        ("Z-Score", lambda r: f"{r.safety.altman_z_score:.2f}" if r.safety and r.safety.altman_z_score else "-"),
-        ("流动比率", lambda r: f"{r.safety.current_ratio:.2f}" if r.safety and r.safety.current_ratio else "-"),
+        (
+            "PE",
+            lambda r: (
+                f"{r.valuation.pe_ratio:.1f}"
+                if r.valuation and r.valuation.pe_ratio
+                else "-"
+            ),
+        ),
+        (
+            "PB",
+            lambda r: (
+                f"{r.valuation.pb_ratio:.2f}"
+                if r.valuation and r.valuation.pb_ratio
+                else "-"
+            ),
+        ),
+        (
+            "市值",
+            lambda r: (
+                _format_market_cap(r.valuation.market_cap)
+                if r.valuation and r.valuation.market_cap
+                else "-"
+            ),
+        ),
+        (
+            "营收(亿)",
+            lambda r: f"{_get_revenue(r) / 1e8:.1f}" if _get_revenue(r) else "-",
+        ),
+        (
+            "净利润(亿)",
+            lambda r: f"{_get_net_profit(r) / 1e8:.1f}" if _get_net_profit(r) else "-",
+        ),
+        (
+            "毛利率",
+            lambda r: (
+                f"{r.profitability.gross_margin * 100:.1f}%"
+                if r.profitability and r.profitability.gross_margin
+                else "-"
+            ),
+        ),
+        (
+            "净利率",
+            lambda r: (
+                f"{r.profitability.net_margin * 100:.1f}%"
+                if r.profitability and r.profitability.net_margin
+                else "-"
+            ),
+        ),
+        (
+            "ROE",
+            lambda r: (
+                f"{r.profitability.roe * 100:.1f}%"
+                if r.profitability and r.profitability.roe
+                else "-"
+            ),
+        ),
+        (
+            "营收增长",
+            lambda r: (
+                f"{r.growth.revenue_growth_yoy * 100:.1f}%"
+                if r.growth and r.growth.revenue_growth_yoy
+                else "-"
+            ),
+        ),
+        (
+            "Z-Score",
+            lambda r: (
+                f"{r.safety.altman_z_score:.2f}"
+                if r.safety and r.safety.altman_z_score
+                else "-"
+            ),
+        ),
+        (
+            "流动比率",
+            lambda r: (
+                f"{r.safety.current_ratio:.2f}"
+                if r.safety and r.safety.current_ratio
+                else "-"
+            ),
+        ),
         ("评分", lambda r: f"{r.get_score():.0f}/100"),
     ]
 
@@ -1164,14 +1297,70 @@ def _compare_to_markdown(stock_codes, results) -> str:
     lines.append(sep)
 
     metrics = [
-        ("PE", lambda r: f"{r.valuation.pe_ratio:.1f}" if r.valuation and r.valuation.pe_ratio else "-"),
-        ("PB", lambda r: f"{r.valuation.pb_ratio:.2f}" if r.valuation and r.valuation.pb_ratio else "-"),
-        ("市值", lambda r: _format_market_cap(r.valuation.market_cap) if r.valuation and r.valuation.market_cap else "-"),
-        ("毛利率", lambda r: f"{r.profitability.gross_margin * 100:.1f}%" if r.profitability and r.profitability.gross_margin else "-"),
-        ("净利率", lambda r: f"{r.profitability.net_margin * 100:.1f}%" if r.profitability and r.profitability.net_margin else "-"),
-        ("ROE", lambda r: f"{r.profitability.roe * 100:.1f}%" if r.profitability and r.profitability.roe else "-"),
-        ("营收增长", lambda r: f"{r.growth.revenue_growth_yoy * 100:.1f}%" if r.growth and r.growth.revenue_growth_yoy else "-"),
-        ("Z-Score", lambda r: f"{r.safety.altman_z_score:.2f}" if r.safety and r.safety.altman_z_score else "-"),
+        (
+            "PE",
+            lambda r: (
+                f"{r.valuation.pe_ratio:.1f}"
+                if r.valuation and r.valuation.pe_ratio
+                else "-"
+            ),
+        ),
+        (
+            "PB",
+            lambda r: (
+                f"{r.valuation.pb_ratio:.2f}"
+                if r.valuation and r.valuation.pb_ratio
+                else "-"
+            ),
+        ),
+        (
+            "市值",
+            lambda r: (
+                _format_market_cap(r.valuation.market_cap)
+                if r.valuation and r.valuation.market_cap
+                else "-"
+            ),
+        ),
+        (
+            "毛利率",
+            lambda r: (
+                f"{r.profitability.gross_margin * 100:.1f}%"
+                if r.profitability and r.profitability.gross_margin
+                else "-"
+            ),
+        ),
+        (
+            "净利率",
+            lambda r: (
+                f"{r.profitability.net_margin * 100:.1f}%"
+                if r.profitability and r.profitability.net_margin
+                else "-"
+            ),
+        ),
+        (
+            "ROE",
+            lambda r: (
+                f"{r.profitability.roe * 100:.1f}%"
+                if r.profitability and r.profitability.roe
+                else "-"
+            ),
+        ),
+        (
+            "营收增长",
+            lambda r: (
+                f"{r.growth.revenue_growth_yoy * 100:.1f}%"
+                if r.growth and r.growth.revenue_growth_yoy
+                else "-"
+            ),
+        ),
+        (
+            "Z-Score",
+            lambda r: (
+                f"{r.safety.altman_z_score:.2f}"
+                if r.safety and r.safety.altman_z_score
+                else "-"
+            ),
+        ),
         ("评分", lambda r: f"{r.get_score():.0f}"),
     ]
 
@@ -1198,13 +1387,56 @@ def _compare_to_csv(stock_codes, results) -> str:
     writer.writerow(["指标"] + stock_codes)
 
     metrics = [
-        ("PE", lambda r: r.valuation.pe_ratio if r.valuation and r.valuation.pe_ratio else None),
-        ("PB", lambda r: r.valuation.pb_ratio if r.valuation and r.valuation.pb_ratio else None),
-        ("毛利率", lambda r: r.profitability.gross_margin if r.profitability and r.profitability.gross_margin else None),
-        ("净利率", lambda r: r.profitability.net_margin if r.profitability and r.profitability.net_margin else None),
-        ("ROE", lambda r: r.profitability.roe if r.profitability and r.profitability.roe else None),
-        ("营收增长", lambda r: r.growth.revenue_growth_yoy if r.growth and r.growth.revenue_growth_yoy else None),
-        ("Z-Score", lambda r: r.safety.altman_z_score if r.safety and r.safety.altman_z_score else None),
+        (
+            "PE",
+            lambda r: (
+                r.valuation.pe_ratio if r.valuation and r.valuation.pe_ratio else None
+            ),
+        ),
+        (
+            "PB",
+            lambda r: (
+                r.valuation.pb_ratio if r.valuation and r.valuation.pb_ratio else None
+            ),
+        ),
+        (
+            "毛利率",
+            lambda r: (
+                r.profitability.gross_margin
+                if r.profitability and r.profitability.gross_margin
+                else None
+            ),
+        ),
+        (
+            "净利率",
+            lambda r: (
+                r.profitability.net_margin
+                if r.profitability and r.profitability.net_margin
+                else None
+            ),
+        ),
+        (
+            "ROE",
+            lambda r: (
+                r.profitability.roe if r.profitability and r.profitability.roe else None
+            ),
+        ),
+        (
+            "营收增长",
+            lambda r: (
+                r.growth.revenue_growth_yoy
+                if r.growth and r.growth.revenue_growth_yoy
+                else None
+            ),
+        ),
+        (
+            "Z-Score",
+            lambda r: (
+                r.safety.altman_z_score
+                if r.safety and r.safety.altman_z_score
+                else None
+            ),
+        ),
     ]
 
     for name, getter in metrics:
@@ -1227,18 +1459,42 @@ def _compare_to_csv(stock_codes, results) -> str:
 
 # 预置的港股热门股票列表
 DEFAULT_HK_STOCKS = [
-    "0700.HK", "9988.HK", "0005.HK", "1299.HK", "0941.HK",
-    "2318.HK", "0388.HK", "9999.HK", "1810.HK", "2020.HK",
-    "9961.HK", "9618.HK", "3690.HK", "9992.HK", "0241.HK",
+    "0700.HK",
+    "9988.HK",
+    "0005.HK",
+    "1299.HK",
+    "0941.HK",
+    "2318.HK",
+    "0388.HK",
+    "9999.HK",
+    "1810.HK",
+    "2020.HK",
+    "9961.HK",
+    "9618.HK",
+    "3690.HK",
+    "9992.HK",
+    "0241.HK",
 ]
 
 DEFAULT_US_STOCKS = [
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA",
-    "META", "TSLA", "BRK.B", "JPM", "V",
+    "AAPL",
+    "MSFT",
+    "GOOGL",
+    "AMZN",
+    "NVDA",
+    "META",
+    "TSLA",
+    "BRK.B",
+    "JPM",
+    "V",
 ]
 
 DEFAULT_A_STOCKS = [
-    "600519.SH", "000858.SZ", "601318.SH", "600036.SH", "000001.SZ",
+    "600519.SH",
+    "000858.SZ",
+    "601318.SH",
+    "600036.SH",
+    "000001.SZ",
 ]
 
 
@@ -1284,7 +1540,9 @@ def cmd_screen(args):
             if min_roe is not None:
                 if report.profitability and report.profitability.roe is not None:
                     if report.profitability.roe < min_roe:
-                        reasons.append(f"ROE={report.profitability.roe * 100:.1f}%<{min_roe * 100:.1f}%")
+                        reasons.append(
+                            f"ROE={report.profitability.roe * 100:.1f}%<{min_roe * 100:.1f}%"
+                        )
                 else:
                     reasons.append("ROE=无数据")
 
@@ -1292,16 +1550,30 @@ def cmd_screen(args):
             if min_growth is not None:
                 if report.growth and report.growth.revenue_growth_yoy is not None:
                     if report.growth.revenue_growth_yoy < min_growth:
-                        reasons.append(f"增长={report.growth.revenue_growth_yoy * 100:.1f}%<{min_growth * 100:.1f}%")
+                        reasons.append(
+                            f"增长={report.growth.revenue_growth_yoy * 100:.1f}%<{min_growth * 100:.1f}%"
+                        )
                 else:
                     reasons.append("增长=无数据")
 
             if reasons:
                 failed.append((code, ", ".join(reasons)))
             else:
-                pe = f"{report.valuation.pe_ratio:.1f}" if report.valuation and report.valuation.pe_ratio else "-"
-                roe = f"{report.profitability.roe * 100:.1f}%" if report.profitability and report.profitability.roe else "-"
-                growth = f"{report.growth.revenue_growth_yoy * 100:.1f}%" if report.growth and report.growth.revenue_growth_yoy else "-"
+                pe = (
+                    f"{report.valuation.pe_ratio:.1f}"
+                    if report.valuation and report.valuation.pe_ratio
+                    else "-"
+                )
+                roe = (
+                    f"{report.profitability.roe * 100:.1f}%"
+                    if report.profitability and report.profitability.roe
+                    else "-"
+                )
+                growth = (
+                    f"{report.growth.revenue_growth_yoy * 100:.1f}%"
+                    if report.growth and report.growth.revenue_growth_yoy
+                    else "-"
+                )
                 score = f"{report.get_score():.0f}"
                 passed.append((code, pe, roe, growth, score))
 
@@ -1312,11 +1584,15 @@ def cmd_screen(args):
     if args.format == "json":
         result = {"passed": [], "failed": [(c, r) for c, r in failed]}
         for code, pe, roe, growth, score in passed:
-            result["passed"].append({"code": code, "pe": pe, "roe": roe, "growth": growth, "score": score})
+            result["passed"].append(
+                {"code": code, "pe": pe, "roe": roe, "growth": growth, "score": score}
+            )
         print(json.dumps(result, ensure_ascii=False, indent=2))
     else:
         print(f"\n📊 选股筛选结果 (市场: {market})")
-        print(f"筛选条件: PE<={max_pe or '不限'}, ROE>={min_roe * 100 if min_roe else '不限'}%, 增长>={min_growth * 100 if min_growth else '不限'}%")
+        print(
+            f"筛选条件: PE<={max_pe or '不限'}, ROE>={min_roe * 100 if min_roe else '不限'}%, 增长>={min_growth * 100 if min_growth else '不限'}%"
+        )
         print()
 
         if passed:
@@ -1456,29 +1732,45 @@ def main():
         "stock_codes", nargs="+", help="股票代码列表 (如 0700.HK 9992.HK 3690.HK)"
     )
     compare_parser.add_argument(
-        "--period", default="annual", choices=["annual", "quarterly"],
+        "--period",
+        default="annual",
+        choices=["annual", "quarterly"],
         help="报告期类型 (默认: annual)",
     )
     compare_parser.add_argument(
-        "--format", default="table", choices=["table", "markdown", "csv", "json"],
+        "--format",
+        default="table",
+        choices=["table", "markdown", "csv", "json"],
         help="输出格式 (默认: table)",
     )
 
     # screen 命令
     screen_parser = subparsers.add_parser("screen", help="选股筛选")
     screen_parser.add_argument(
-        "--market", default="HK", choices=["A", "HK", "US"],
+        "--market",
+        default="HK",
+        choices=["A", "HK", "US"],
         help="市场 (默认: HK)",
     )
-    screen_parser.add_argument("--min-roe", type=float, default=None, help="最低 ROE (百分比，如 15)")
-    screen_parser.add_argument("--max-pe", type=float, default=None, help="最高 PE (如 30)")
-    screen_parser.add_argument("--min-growth", type=float, default=None, help="最低营收增长率 (百分比，如 20)")
     screen_parser.add_argument(
-        "--period", default="annual", choices=["annual", "quarterly"],
+        "--min-roe", type=float, default=None, help="最低 ROE (百分比，如 15)"
+    )
+    screen_parser.add_argument(
+        "--max-pe", type=float, default=None, help="最高 PE (如 30)"
+    )
+    screen_parser.add_argument(
+        "--min-growth", type=float, default=None, help="最低营收增长率 (百分比，如 20)"
+    )
+    screen_parser.add_argument(
+        "--period",
+        default="annual",
+        choices=["annual", "quarterly"],
         help="报告期类型 (默认: annual)",
     )
     screen_parser.add_argument(
-        "--format", default="pretty", choices=["pretty", "json"],
+        "--format",
+        default="pretty",
+        choices=["pretty", "json"],
         help="输出格式 (默认: pretty)",
     )
 

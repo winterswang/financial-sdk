@@ -72,7 +72,10 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "stock_code": {"type": "string", "description": "股票代码，支持格式: A股(600000.SH)、港股(0700.HK)、美股(AAPL)"},
+                    "stock_code": {
+                        "type": "string",
+                        "description": "股票代码，支持格式: A股(600000.SH)、港股(0700.HK)、美股(AAPL)",
+                    },
                     "report_type": {"type": "string", "default": "all"},
                     "period": {"type": "string", "default": "annual"},
                     "force_refresh": {"type": "boolean", "default": False},
@@ -86,9 +89,16 @@ async def list_tools() -> list[Tool]:
             inputSchema={
                 "type": "object",
                 "properties": {
-                    "stock_code": {"type": "string", "description": "股票代码，支持格式: A股(600000.SH)、港股(0700.HK)、美股(AAPL)"},
+                    "stock_code": {
+                        "type": "string",
+                        "description": "股票代码，支持格式: A股(600000.SH)、港股(0700.HK)、美股(AAPL)",
+                    },
                     "period": {"type": "string", "default": "annual"},
-                    "dimension": {"type": "string", "description": "分析维度: valuation/profitability/efficiency/growth/safety，不指定则输出完整报告", "default": None},
+                    "dimension": {
+                        "type": "string",
+                        "description": "分析维度: valuation/profitability/efficiency/growth/safety，不指定则输出完整报告",
+                        "default": None,
+                    },
                 },
                 "required": ["stock_code"],
             },
@@ -133,9 +143,26 @@ async def call_tool(name: str, arguments: Any) -> CallToolResult:
         if name == "get_financial_data":
             stock_code = arguments.get("stock_code")
             if not stock_code:
-                return CallToolResult(content=[TextContent(type="text", text="Error: stock_code is required")], isError=True)
-            if not isinstance(stock_code, str) or len(stock_code) > 20 or not STOCK_CODE_PATTERN.match(stock_code):
-                return CallToolResult(content=[TextContent(type="text", text=f"Error: invalid stock_code format: {stock_code}")], isError=True)
+                return CallToolResult(
+                    content=[
+                        TextContent(type="text", text="Error: stock_code is required")
+                    ],
+                    isError=True,
+                )
+            if (
+                not isinstance(stock_code, str)
+                or len(stock_code) > 20
+                or not STOCK_CODE_PATTERN.match(stock_code)
+            ):
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=f"Error: invalid stock_code format: {stock_code}",
+                        )
+                    ],
+                    isError=True,
+                )
             try:
                 bundle = facade.get_financial_data(
                     stock_code=stock_code,
@@ -143,16 +170,57 @@ async def call_tool(name: str, arguments: Any) -> CallToolResult:
                     period=arguments.get("period", "annual"),
                     force_refresh=arguments.get("force_refresh", False),
                 )
-                return CallToolResult(content=[TextContent(type="text", text=json.dumps(_bundle_to_dict(bundle), ensure_ascii=False, indent=2))])
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                _bundle_to_dict(bundle), ensure_ascii=False, indent=2
+                            ),
+                        )
+                    ]
+                )
             except NoAdapterAvailableError as e:
-                return CallToolResult(content=[TextContent(type="text", text=json.dumps({"error": "NoAdapterAvailableError", "stock_code": stock_code, "message": str(e)}, ensure_ascii=False))], isError=True)
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {
+                                    "error": "NoAdapterAvailableError",
+                                    "stock_code": stock_code,
+                                    "message": str(e),
+                                },
+                                ensure_ascii=False,
+                            ),
+                        )
+                    ],
+                    isError=True,
+                )
 
         elif name == "analyze":
             stock_code = arguments.get("stock_code")
             if not stock_code:
-                return CallToolResult(content=[TextContent(type="text", text="Error: stock_code is required")], isError=True)
-            if not isinstance(stock_code, str) or len(stock_code) > 20 or not STOCK_CODE_PATTERN.match(stock_code):
-                return CallToolResult(content=[TextContent(type="text", text=f"Error: invalid stock_code format: {stock_code}")], isError=True)
+                return CallToolResult(
+                    content=[
+                        TextContent(type="text", text="Error: stock_code is required")
+                    ],
+                    isError=True,
+                )
+            if (
+                not isinstance(stock_code, str)
+                or len(stock_code) > 20
+                or not STOCK_CODE_PATTERN.match(stock_code)
+            ):
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=f"Error: invalid stock_code format: {stock_code}",
+                        )
+                    ],
+                    isError=True,
+                )
             try:
                 analytics = FinancialAnalytics()
                 dimension = arguments.get("dimension")
@@ -168,29 +236,115 @@ async def call_tool(name: str, arguments: Any) -> CallToolResult:
                     }
                     func = dim_map.get(dimension)
                     if func is None:
-                        return CallToolResult(content=[TextContent(type="text", text=f"Error: unknown dimension '{dimension}'. Use: valuation/profitability/efficiency/growth/safety")], isError=True)
+                        return CallToolResult(
+                            content=[
+                                TextContent(
+                                    type="text",
+                                    text=f"Error: unknown dimension '{dimension}'. Use: valuation/profitability/efficiency/growth/safety",
+                                )
+                            ],
+                            isError=True,
+                        )
                     metrics = func(stock_code, period)
                     if metrics is None:
-                        return CallToolResult(content=[TextContent(type="text", text=json.dumps({"stock_code": stock_code, "dimension": dimension, "result": None, "message": "该维度数据不可用"}, ensure_ascii=False))])
-                    return CallToolResult(content=[TextContent(type="text", text=json.dumps(metrics.to_dict(), ensure_ascii=False, indent=2, default=str))])
+                        return CallToolResult(
+                            content=[
+                                TextContent(
+                                    type="text",
+                                    text=json.dumps(
+                                        {
+                                            "stock_code": stock_code,
+                                            "dimension": dimension,
+                                            "result": None,
+                                            "message": "该维度数据不可用",
+                                        },
+                                        ensure_ascii=False,
+                                    ),
+                                )
+                            ]
+                        )
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    metrics.to_dict(),
+                                    ensure_ascii=False,
+                                    indent=2,
+                                    default=str,
+                                ),
+                            )
+                        ]
+                    )
                 else:
                     report = analytics.get_full_report(stock_code, period)
                     if report is None:
-                        return CallToolResult(content=[TextContent(type="text", text=json.dumps({"stock_code": stock_code, "result": None, "message": "所有维度分析均失败"}, ensure_ascii=False))])
+                        return CallToolResult(
+                            content=[
+                                TextContent(
+                                    type="text",
+                                    text=json.dumps(
+                                        {
+                                            "stock_code": stock_code,
+                                            "result": None,
+                                            "message": "所有维度分析均失败",
+                                        },
+                                        ensure_ascii=False,
+                                    ),
+                                )
+                            ]
+                        )
                     result = report.to_dict()
                     result["score"] = report.get_score()
                     if report.failed_dimensions:
                         result["failed_dimensions"] = report.failed_dimensions
-                    return CallToolResult(content=[TextContent(type="text", text=json.dumps(result, ensure_ascii=False, indent=2, default=str))])
+                    return CallToolResult(
+                        content=[
+                            TextContent(
+                                type="text",
+                                text=json.dumps(
+                                    result, ensure_ascii=False, indent=2, default=str
+                                ),
+                            )
+                        ]
+                    )
             except Exception as e:
-                return CallToolResult(content=[TextContent(type="text", text=json.dumps({"error": str(e), "stock_code": stock_code}, ensure_ascii=False))], isError=True)
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": str(e), "stock_code": stock_code},
+                                ensure_ascii=False,
+                            ),
+                        )
+                    ],
+                    isError=True,
+                )
 
         elif name == "diagnose":
             stock_code = arguments.get("stock_code")
             if not stock_code:
-                return CallToolResult(content=[TextContent(type="text", text="Error: stock_code is required")], isError=True)
-            if not isinstance(stock_code, str) or len(stock_code) > 20 or not STOCK_CODE_PATTERN.match(stock_code):
-                return CallToolResult(content=[TextContent(type="text", text=f"Error: invalid stock_code format: {stock_code}")], isError=True)
+                return CallToolResult(
+                    content=[
+                        TextContent(type="text", text="Error: stock_code is required")
+                    ],
+                    isError=True,
+                )
+            if (
+                not isinstance(stock_code, str)
+                or len(stock_code) > 20
+                or not STOCK_CODE_PATTERN.match(stock_code)
+            ):
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=f"Error: invalid stock_code format: {stock_code}",
+                        )
+                    ],
+                    isError=True,
+                )
             try:
                 bundle = facade.get_financial_data(
                     stock_code=stock_code,
@@ -223,62 +377,155 @@ async def call_tool(name: str, arguments: Any) -> CallToolResult:
 
                 # Valuation
                 diagnosis["dimensions"]["valuation"] = {
-                    "status": "ok" if (_check_field(indicators, "eps") == "ok" or _check_field(income, "eps") == "ok") else "degraded",
+                    "status": "ok"
+                    if (
+                        _check_field(indicators, "eps") == "ok"
+                        or _check_field(income, "eps") == "ok"
+                    )
+                    else "degraded",
                     "required_fields": {
-                        "eps": _check_field(indicators, "eps") if indicators is not None else "missing: 无数据",
-                        "pe_ratio": _check_field(indicators, "pe_ratio") if indicators is not None else "missing: 无数据",
-                        "pb_ratio": _check_field(indicators, "pb_ratio") if indicators is not None else "missing: 无数据",
+                        "eps": _check_field(indicators, "eps")
+                        if indicators is not None
+                        else "missing: 无数据",
+                        "pe_ratio": _check_field(indicators, "pe_ratio")
+                        if indicators is not None
+                        else "missing: 无数据",
+                        "pb_ratio": _check_field(indicators, "pb_ratio")
+                        if indicators is not None
+                        else "missing: 无数据",
                     },
                 }
 
                 # Profitability
-                prof_fields = {"revenue": _check_field(income, "revenue"), "net_profit": _check_field(income, "net_profit"), "total_equity": _check_field(balance, "total_equity"), "gross_profit": _check_field(income, "gross_profit")}
+                prof_fields = {
+                    "revenue": _check_field(income, "revenue"),
+                    "net_profit": _check_field(income, "net_profit"),
+                    "total_equity": _check_field(balance, "total_equity"),
+                    "gross_profit": _check_field(income, "gross_profit"),
+                }
                 prof_ok = all(v == "ok" for v in prof_fields.values())
-                diagnosis["dimensions"]["profitability"] = {"status": "ok" if prof_ok else "degraded", "required_fields": prof_fields}
+                diagnosis["dimensions"]["profitability"] = {
+                    "status": "ok" if prof_ok else "degraded",
+                    "required_fields": prof_fields,
+                }
 
                 # Efficiency
-                eff_fields = {"inventory": _check_field(balance, "inventory"), "accounts_receivable": _check_field(balance, "accounts_receivable"), "accounts_payable": _check_field(balance, "accounts_payable")}
+                eff_fields = {
+                    "inventory": _check_field(balance, "inventory"),
+                    "accounts_receivable": _check_field(balance, "accounts_receivable"),
+                    "accounts_payable": _check_field(balance, "accounts_payable"),
+                }
                 eff_ok = all(v == "ok" for v in eff_fields.values())
-                diagnosis["dimensions"]["efficiency"] = {"status": "ok" if eff_ok else "degraded", "required_fields": eff_fields}
+                diagnosis["dimensions"]["efficiency"] = {
+                    "status": "ok" if eff_ok else "degraded",
+                    "required_fields": eff_fields,
+                }
 
                 # Growth - need 2+ periods
                 has_multi_period = False
-                if income is not None and not income.empty and "report_date" in income.columns:
+                if (
+                    income is not None
+                    and not income.empty
+                    and "report_date" in income.columns
+                ):
                     has_multi_period = income["report_date"].nunique() >= 2
                 diagnosis["dimensions"]["growth"] = {
                     "status": "ok" if has_multi_period else "degraded",
-                    "required_fields": {"multi_period_data": "ok" if has_multi_period else "missing: 需要至少2期数据"},
+                    "required_fields": {
+                        "multi_period_data": "ok"
+                        if has_multi_period
+                        else "missing: 需要至少2期数据"
+                    },
                 }
 
                 # Safety
-                safety_fields = {"current_assets": _check_field(balance, "current_assets"), "current_liabilities": _check_field(balance, "current_liabilities"), "total_equity": _check_field(balance, "total_equity")}
+                safety_fields = {
+                    "current_assets": _check_field(balance, "current_assets"),
+                    "current_liabilities": _check_field(balance, "current_liabilities"),
+                    "total_equity": _check_field(balance, "total_equity"),
+                }
                 safety_ok = all(v == "ok" for v in safety_fields.values())
-                diagnosis["dimensions"]["safety"] = {"status": "ok" if safety_ok else "degraded", "required_fields": safety_fields}
+                diagnosis["dimensions"]["safety"] = {
+                    "status": "ok" if safety_ok else "degraded",
+                    "required_fields": safety_fields,
+                }
 
-                return CallToolResult(content=[TextContent(type="text", text=json.dumps(diagnosis, ensure_ascii=False, indent=2))])
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(diagnosis, ensure_ascii=False, indent=2),
+                        )
+                    ]
+                )
             except Exception as e:
-                return CallToolResult(content=[TextContent(type="text", text=json.dumps({"error": str(e), "stock_code": stock_code}, ensure_ascii=False))], isError=True)
+                return CallToolResult(
+                    content=[
+                        TextContent(
+                            type="text",
+                            text=json.dumps(
+                                {"error": str(e), "stock_code": stock_code},
+                                ensure_ascii=False,
+                            ),
+                        )
+                    ],
+                    isError=True,
+                )
 
         elif name == "get_supported_stocks":
             stocks = facade.get_supported_stocks(market=arguments.get("market", "all"))
-            return CallToolResult(content=[TextContent(type="text", text=json.dumps({"market": arguments.get("market", "all"), "stocks": stocks}, ensure_ascii=False, indent=2))])
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(
+                            {
+                                "market": arguments.get("market", "all"),
+                                "stocks": stocks,
+                            },
+                            ensure_ascii=False,
+                            indent=2,
+                        ),
+                    )
+                ]
+            )
 
         elif name == "health_check":
             health = facade.health_check()
-            return CallToolResult(content=[TextContent(type="text", text=json.dumps(health.to_dict(), ensure_ascii=False, indent=2))])
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(health.to_dict(), ensure_ascii=False, indent=2),
+                    )
+                ]
+            )
 
         elif name == "get_cache_stats":
             stats = facade.get_cache_stats()
-            return CallToolResult(content=[TextContent(type="text", text=json.dumps(stats, ensure_ascii=False, indent=2))])
+            return CallToolResult(
+                content=[
+                    TextContent(
+                        type="text",
+                        text=json.dumps(stats, ensure_ascii=False, indent=2),
+                    )
+                ]
+            )
 
         else:
-            return CallToolResult(content=[TextContent(type="text", text=f"Unknown tool: {name}")], isError=True)
+            return CallToolResult(
+                content=[TextContent(type="text", text=f"Unknown tool: {name}")],
+                isError=True,
+            )
 
     except Exception as e:
-        return CallToolResult(content=[TextContent(type="text", text=f"Error: {str(e)}")], isError=True)
+        return CallToolResult(
+            content=[TextContent(type="text", text=f"Error: {str(e)}")], isError=True
+        )
 
 
 if __name__ == "__main__":
+
     async def run():
         async with stdio_server() as (read_stream, write_stream):
             await server.run(

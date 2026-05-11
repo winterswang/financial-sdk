@@ -16,7 +16,9 @@ from typing import Any, Dict, Optional
 import pandas as pd
 
 
-def get_value_from_df(df: Optional[pd.DataFrame], field: str, index: int = -1) -> Optional[float]:
+def get_value_from_df(
+    df: Optional[pd.DataFrame], field: str, index: int = -1
+) -> Optional[float]:
     """从 DataFrame 获取字段值"""
     if df is None or df.empty:
         return None
@@ -270,7 +272,9 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
         shares = total_equity / bvps
     if current_price is not None and shares is not None and shares > 0:
         market_cap = current_price * shares
-        enterprise_value = market_cap + (total_liabilities or 0) - (cash_and_equivalents or 0)
+        enterprise_value = (
+            market_cap + (total_liabilities or 0) - (cash_and_equivalents or 0)
+        )
         metrics["enterprise_value"] = {
             "formula": f"市值({market_cap:.2f}) + 债务({total_liabilities or 0:.2f}) - 现金({cash_and_equivalents or 0:.2f})",
             "numerator_value": market_cap + (total_liabilities or 0),
@@ -307,7 +311,11 @@ def diagnose_stock(stock_code: str) -> Dict[str, Any]:
         }
 
     # 流动比率 = 流动资产 / 流动负债
-    if current_assets is not None and current_liabilities is not None and current_liabilities > 0:
+    if (
+        current_assets is not None
+        and current_liabilities is not None
+        and current_liabilities > 0
+    ):
         calc_current_ratio = current_assets / current_liabilities
         metrics["current_ratio"] = {
             "formula": f"{current_assets:.2f} / {current_liabilities:.2f}",
@@ -365,8 +373,14 @@ def print_raw_data_for_verification(result: Dict[str, Any]) -> None:
     # 资产负债表数据
     print("\n## 资产负债表数据")
     print("-" * 40)
-    for key in ["total_assets", "total_liabilities", "total_equity",
-                "current_assets", "current_liabilities", "cash_and_equivalents"]:
+    for key in [
+        "total_assets",
+        "total_liabilities",
+        "total_equity",
+        "current_assets",
+        "current_liabilities",
+        "cash_and_equivalents",
+    ]:
         if key in raw:
             val = raw[key]["value"]
             print(f"  {key}: {val:,.4f}")
@@ -404,7 +418,7 @@ def print_raw_data_for_verification(result: Dict[str, Any]) -> None:
         print(f"  公式: {metric_data['formula']}")
         print(f"  分子 = {format_metric_value(metric_data.get('numerator'))}")
         print(f"  分母 = {format_metric_value(metric_data.get('denominator'))}")
-        if 'note' in metric_data:
+        if "note" in metric_data:
             print(f"  说明: {metric_data['note']}")
 
 
@@ -447,14 +461,18 @@ def print_diagnosis(result: Dict[str, Any]) -> None:
         for metric_name, metric_data in sorted(metrics.items()):
             print(f"\n  【{metric_name}】 {metric_data.get('unit', '')}")
             print(f"    公式: {metric_data['formula']}")
-            print(f"    分子 (Numerator): {format_metric_value(metric_data.get('numerator'))}")
-            print(f"    分母 (Denominator): {format_metric_value(metric_data.get('denominator'))}")
+            print(
+                f"    分子 (Numerator): {format_metric_value(metric_data.get('numerator'))}"
+            )
+            print(
+                f"    分母 (Denominator): {format_metric_value(metric_data.get('denominator'))}"
+            )
             print(f"    计算结果: {metric_data['calculated']:.4f}")
 
             # 如果有数据源的原始值，进行对比
             source_val = metric_data.get("source_value")
             if source_val is not None:
-                diff = abs(metric_data['calculated'] - source_val)
+                diff = abs(metric_data["calculated"] - source_val)
                 print(f"    数据源原始值: {source_val:.4f}")
                 print(f"    差异: {diff:.4f}")
                 if diff < 0.01:
@@ -476,11 +494,12 @@ def main():
 
     # 完整诊断模式：显示计算结果对比
     python src/financial_sdk_cli_diagnose.py 0700.HK
-        """
+        """,
     )
     parser.add_argument("stock_code", help="股票代码 (如 0700.HK, AAPL, 600000.SH)")
-    parser.add_argument("--verify", action="store_true",
-                        help="简化模式：只显示原始数据，方便去网站核对")
+    parser.add_argument(
+        "--verify", action="store_true", help="简化模式：只显示原始数据，方便去网站核对"
+    )
     args = parser.parse_args()
 
     print(f"正在获取 {args.stock_code} 的数据并分析...")
@@ -495,6 +514,7 @@ def main():
     except Exception as e:
         print(f"诊断失败: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 

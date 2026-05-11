@@ -33,20 +33,20 @@ def _get_current_ratio_from_akshare(stock_code: str) -> Optional[float]:
         import akshare as ak
 
         # 港股
-        if stock_code.endswith('.HK'):
+        if stock_code.endswith(".HK"):
             # AkShare 需要 5 位代码，前导补零
-            code = stock_code.replace('.HK', '').zfill(5)
+            code = stock_code.replace(".HK", "").zfill(5)
             df = ak.stock_financial_hk_analysis_indicator_em(symbol=code)
-            if df is not None and not df.empty and 'CURRENT_RATIO' in df.columns:
-                val = df['CURRENT_RATIO'].dropna().values
+            if df is not None and not df.empty and "CURRENT_RATIO" in df.columns:
+                val = df["CURRENT_RATIO"].dropna().values
                 if len(val) > 0:
                     return float(val[0])
 
         # 美股
-        elif not ('.SH' in stock_code or '.SZ' in stock_code):
+        elif not (".SH" in stock_code or ".SZ" in stock_code):
             df = ak.stock_financial_us_analysis_indicator_em(symbol=stock_code)
-            if df is not None and not df.empty and 'CURRENT_RATIO' in df.columns:
-                val = df['CURRENT_RATIO'].dropna().values
+            if df is not None and not df.empty and "CURRENT_RATIO" in df.columns:
+                val = df["CURRENT_RATIO"].dropna().values
                 if len(val) > 0:
                     return float(val[0])
 
@@ -70,20 +70,20 @@ def _get_quick_ratio_from_akshare(stock_code: str) -> Optional[float]:
         import akshare as ak
 
         # 港股
-        if stock_code.endswith('.HK'):
+        if stock_code.endswith(".HK"):
             # AkShare 需要 5 位代码，前导补零
-            code = stock_code.replace('.HK', '').zfill(5)
+            code = stock_code.replace(".HK", "").zfill(5)
             df = ak.stock_financial_hk_analysis_indicator_em(symbol=code)
-            if df is not None and not df.empty and 'SPEED_RATIO' in df.columns:
-                val = df['SPEED_RATIO'].dropna().values
+            if df is not None and not df.empty and "SPEED_RATIO" in df.columns:
+                val = df["SPEED_RATIO"].dropna().values
                 if len(val) > 0:
                     return float(val[0])
 
         # 美股
-        elif not ('.SH' in stock_code or '.SZ' in stock_code):
+        elif not (".SH" in stock_code or ".SZ" in stock_code):
             df = ak.stock_financial_us_analysis_indicator_em(symbol=stock_code)
-            if df is not None and not df.empty and 'SPEED_RATIO' in df.columns:
-                val = df['SPEED_RATIO'].dropna().values
+            if df is not None and not df.empty and "SPEED_RATIO" in df.columns:
+                val = df["SPEED_RATIO"].dropna().values
                 if len(val) > 0:
                     return float(val[0])
 
@@ -250,8 +250,15 @@ class SafetyAnalyzer(BaseAnalyzer):
         """
         if _facade_override:
             try:
-                bundle = _facade_override.get_financial_data(stock_code=stock_code, report_type="all", period=period)
-                fs_data = {"income_statement": bundle.income_statement, "balance_sheet": bundle.balance_sheet, "cash_flow": bundle.cash_flow, "indicators": bundle.indicators}
+                bundle = _facade_override.get_financial_data(
+                    stock_code=stock_code, report_type="all", period=period
+                )
+                fs_data = {
+                    "income_statement": bundle.income_statement,
+                    "balance_sheet": bundle.balance_sheet,
+                    "cash_flow": bundle.cash_flow,
+                    "indicators": bundle.indicators,
+                }
             except Exception:
                 return None
         else:
@@ -516,7 +523,11 @@ class SafetyAnalyzer(BaseAnalyzer):
                 current_assets, inventory, current_liabilities
             )
             cash_ratio = None
-            if cash is not None and current_liabilities is not None and current_liabilities > 0:
+            if (
+                cash is not None
+                and current_liabilities is not None
+                and current_liabilities > 0
+            ):
                 cash_ratio = cash / current_liabilities
 
             # 计算偿债能力
@@ -551,7 +562,9 @@ class SafetyAnalyzer(BaseAnalyzer):
                 and revenue is not None
             ):
                 altman_z_score = self._calculator.calculate_altman_z_score(
-                    working_capital=current_assets - current_liabilities if current_assets and current_liabilities else None,
+                    working_capital=current_assets - current_liabilities
+                    if current_assets and current_liabilities
+                    else None,
                     total_assets=total_assets,
                     retained_earnings=retained_earnings,
                     ebit=operating_profit,
@@ -562,7 +575,11 @@ class SafetyAnalyzer(BaseAnalyzer):
 
             # 股权比率和负债比率
             equity_ratio = None
-            if total_equity is not None and total_assets is not None and total_assets > 0:
+            if (
+                total_equity is not None
+                and total_assets is not None
+                and total_assets > 0
+            ):
                 equity_ratio = total_equity / total_assets
 
             debt_ratio = None
@@ -596,7 +613,9 @@ class SafetyAnalyzer(BaseAnalyzer):
             price_healthy = False
 
         facade_healthy = result["status"] == "healthy"
-        result["status"] = "healthy" if (facade_healthy and price_healthy) else "degraded"
+        result["status"] = (
+            "healthy" if (facade_healthy and price_healthy) else "degraded"
+        )
         result["facade_available"] = facade_healthy
         result["price_provider_available"] = price_healthy
         result.pop("supported_markets", None)

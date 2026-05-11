@@ -97,7 +97,17 @@ class FullAnalysisReport:
             综合评分
         """
         score = 50.0  # 基础分
-        available_dims = sum(1 for m in [self.valuation, self.profitability, self.efficiency, self.growth, self.safety] if m is not None)
+        available_dims = sum(
+            1
+            for m in [
+                self.valuation,
+                self.profitability,
+                self.efficiency,
+                self.growth,
+                self.safety,
+            ]
+            if m is not None
+        )
         missing_dims = 5 - available_dims
         score -= missing_dims * 10  # 维度缺失惩罚
 
@@ -127,7 +137,7 @@ class FullAnalysisReport:
             elif growth < -0.10:
                 score -= 10  # 大幅负增长扣分
             elif growth < 0:
-                score -= 5   # 轻微负增长扣分
+                score -= 5  # 轻微负增长扣分
 
         # 安全性评分 (最高 +15, 最低 -10)
         if self.safety and self.safety.altman_z_score is not None:
@@ -458,7 +468,9 @@ class FinancialAnalytics:
             valuation = self._valuation.get_valuation_metrics(stock_code, period)
             if valuation is None:
                 failed_dims.append("valuation")
-                logger.warning(f"Stock {stock_code}: valuation returned None (data unavailable)")
+                logger.warning(
+                    f"Stock {stock_code}: valuation returned None (data unavailable)"
+                )
         except Exception as e:
             failed_dims.append("valuation")
             logger.warning(f"Stock {stock_code}: valuation analysis failed: {e}")
@@ -470,7 +482,9 @@ class FinancialAnalytics:
             )
             if profitability is None:
                 failed_dims.append("profitability")
-                logger.warning(f"Stock {stock_code}: profitability returned None (data unavailable)")
+                logger.warning(
+                    f"Stock {stock_code}: profitability returned None (data unavailable)"
+                )
         except Exception as e:
             failed_dims.append("profitability")
             logger.warning(f"Stock {stock_code}: profitability analysis failed: {e}")
@@ -480,7 +494,9 @@ class FinancialAnalytics:
             efficiency = self._efficiency.get_efficiency_metrics(stock_code, period)
             if efficiency is None:
                 failed_dims.append("efficiency")
-                logger.warning(f"Stock {stock_code}: efficiency returned None (data unavailable)")
+                logger.warning(
+                    f"Stock {stock_code}: efficiency returned None (data unavailable)"
+                )
         except Exception as e:
             failed_dims.append("efficiency")
             logger.warning(f"Stock {stock_code}: efficiency analysis failed: {e}")
@@ -490,7 +506,9 @@ class FinancialAnalytics:
             growth = self._growth.get_growth_metrics(stock_code, period)
             if growth is None:
                 failed_dims.append("growth")
-                logger.warning(f"Stock {stock_code}: growth returned None (data unavailable)")
+                logger.warning(
+                    f"Stock {stock_code}: growth returned None (data unavailable)"
+                )
         except Exception as e:
             failed_dims.append("growth")
             logger.warning(f"Stock {stock_code}: growth analysis failed: {e}")
@@ -500,7 +518,9 @@ class FinancialAnalytics:
             safety = self._safety.get_safety_metrics(stock_code, period)
             if safety is None:
                 failed_dims.append("safety")
-                logger.warning(f"Stock {stock_code}: safety returned None (data unavailable)")
+                logger.warning(
+                    f"Stock {stock_code}: safety returned None (data unavailable)"
+                )
         except Exception as e:
             failed_dims.append("safety")
             logger.warning(f"Stock {stock_code}: safety analysis failed: {e}")

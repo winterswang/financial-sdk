@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from ..facade import FinancialFacade  # noqa: F401
 
 
-
 @dataclass
 class GrowthMetrics:
     """
@@ -201,8 +200,15 @@ class GrowthAnalyzer(BaseAnalyzer):
         """
         if _facade_override:
             try:
-                bundle = _facade_override.get_financial_data(stock_code=stock_code, report_type="all", period=period)
-                fs_data = {"income_statement": bundle.income_statement, "balance_sheet": bundle.balance_sheet, "cash_flow": bundle.cash_flow, "indicators": bundle.indicators}
+                bundle = _facade_override.get_financial_data(
+                    stock_code=stock_code, report_type="all", period=period
+                )
+                fs_data = {
+                    "income_statement": bundle.income_statement,
+                    "balance_sheet": bundle.balance_sheet,
+                    "cash_flow": bundle.cash_flow,
+                    "indicators": bundle.indicators,
+                }
             except Exception:
                 return None
         else:
@@ -399,15 +405,19 @@ class GrowthAnalyzer(BaseAnalyzer):
                 if balance is not None:
                     equity = self._get_series(balance, "total_equity")
                     if equity and len(equity) >= 1:
-                        roe = latest_net_profit / equity[-1] if equity[-1] != 0 else None
+                        roe = (
+                            latest_net_profit / equity[-1] if equity[-1] != 0 else None
+                        )
 
                 if roe is not None:
                     # 默认留存率 70%，后续可从分红数据推算
                     retention_rate = 0.7
 
-                    sustainable_growth = self._calculator.calculate_sustainable_growth_rate(
-                        roe=roe,
-                        retention_rate=retention_rate,
+                    sustainable_growth = (
+                        self._calculator.calculate_sustainable_growth_rate(
+                            roe=roe,
+                            retention_rate=retention_rate,
+                        )
                     )
 
             return GrowthMetrics(

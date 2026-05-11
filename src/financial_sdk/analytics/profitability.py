@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from ..facade import FinancialFacade  # noqa: F401
 
 
-
 @dataclass
 class ProfitabilityMetrics:
     """
@@ -182,8 +181,15 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
         """
         if _facade_override:
             try:
-                bundle = _facade_override.get_financial_data(stock_code=stock_code, report_type="all", period=period)
-                fs_data = {"income_statement": bundle.income_statement, "balance_sheet": bundle.balance_sheet, "cash_flow": bundle.cash_flow, "indicators": bundle.indicators}
+                bundle = _facade_override.get_financial_data(
+                    stock_code=stock_code, report_type="all", period=period
+                )
+                fs_data = {
+                    "income_statement": bundle.income_statement,
+                    "balance_sheet": bundle.balance_sheet,
+                    "cash_flow": bundle.cash_flow,
+                    "indicators": bundle.indicators,
+                }
             except Exception:
                 return None
         else:
@@ -260,19 +266,33 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
                 # 估算: 总负债 - 主要非带息负债
                 accounts_payable = self._get_value(balance, "accounts_payable") or 0
                 customer_deposits = 0
-                for field in ["customer_deposits", "customer_deposits_and_placements", "客户存款及垫款"]:
+                for field in [
+                    "customer_deposits",
+                    "customer_deposits_and_placements",
+                    "客户存款及垫款",
+                ]:
                     val = self._get_value(balance, field)
                     if val:
                         customer_deposits = val
                         break
                 deferred_revenue = 0
-                for field in ["deferred_revenue", "advance_from_customers", "预收及预提费用"]:
+                for field in [
+                    "deferred_revenue",
+                    "advance_from_customers",
+                    "预收及预提费用",
+                ]:
                     val = self._get_value(balance, field)
                     if val:
                         deferred_revenue = val
                         break
 
-                interest_bearing_debt = max(0, total_liabilities - accounts_payable - customer_deposits - deferred_revenue)
+                interest_bearing_debt = max(
+                    0,
+                    total_liabilities
+                    - accounts_payable
+                    - customer_deposits
+                    - deferred_revenue,
+                )
 
             roic = self._calculator.calculate_roic(
                 ebit=operating_profit,
@@ -430,7 +450,9 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
                 cash = self._get_value(balance, "cash_and_short_term_deposits")
 
             # 计算基础利润率
-            gross_margin = self._calculator.calculate_gross_margin(gross_profit, revenue)
+            gross_margin = self._calculator.calculate_gross_margin(
+                gross_profit, revenue
+            )
             operating_margin = self._calculator.calculate_operating_profit_margin(
                 operating_profit, revenue
             )
@@ -473,18 +495,32 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
             if interest_bearing_debt is None and total_liabilities is not None:
                 accounts_payable = self._get_value(balance, "accounts_payable") or 0
                 customer_deposits = 0
-                for field in ["customer_deposits", "customer_deposits_and_placements", "客户存款及垫款"]:
+                for field in [
+                    "customer_deposits",
+                    "customer_deposits_and_placements",
+                    "客户存款及垫款",
+                ]:
                     val = self._get_value(balance, field)
                     if val:
                         customer_deposits = val
                         break
                 deferred_revenue = 0
-                for field in ["deferred_revenue", "advance_from_customers", "预收及预提费用"]:
+                for field in [
+                    "deferred_revenue",
+                    "advance_from_customers",
+                    "预收及预提费用",
+                ]:
                     val = self._get_value(balance, field)
                     if val:
                         deferred_revenue = val
                         break
-                interest_bearing_debt = max(0, total_liabilities - accounts_payable - customer_deposits - deferred_revenue)
+                interest_bearing_debt = max(
+                    0,
+                    total_liabilities
+                    - accounts_payable
+                    - customer_deposits
+                    - deferred_revenue,
+                )
 
             if cash is None:
                 cash = self._get_value(balance, "cash_and_short_term_deposits")
@@ -526,7 +562,9 @@ class ProfitabilityAnalyzer(BaseAnalyzer):
                 roic=roic,
                 dupont_net_margin=dupont.get("net_margin") if dupont else None,
                 dupont_asset_turnover=dupont.get("asset_turnover") if dupont else None,
-                dupont_equity_multiplier=dupont.get("equity_multiplier") if dupont else None,
+                dupont_equity_multiplier=dupont.get("equity_multiplier")
+                if dupont
+                else None,
                 dupont_roe=dupont.get("roe") if dupont else None,
                 calculation_timestamp=datetime.now().isoformat(),
             )

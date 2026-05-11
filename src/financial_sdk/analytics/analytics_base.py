@@ -96,7 +96,9 @@ class BaseAnalyzer(ABC):
             值或 None
         """
         if df is None or df.empty:
-            logger.debug(f"[{self.analyzer_name}] _get_value('{field}'): DataFrame 为空")
+            logger.debug(
+                f"[{self.analyzer_name}] _get_value('{field}'): DataFrame 为空"
+            )
             return None
         if field not in df.columns:
             available = sorted(df.columns.tolist())
@@ -114,7 +116,9 @@ class BaseAnalyzer(ABC):
 
         values = df_sorted[field].dropna()
         if values.empty:
-            logger.debug(f"[{self.analyzer_name}] _get_value('{field}'): 字段存在但值为空")
+            logger.debug(
+                f"[{self.analyzer_name}] _get_value('{field}'): 字段存在但值为空"
+            )
             return None
 
         if period_index < len(values):

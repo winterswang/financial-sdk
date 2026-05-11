@@ -96,8 +96,7 @@ class FinancialCache:
 
     @staticmethod
     def make_cache_key(
-        market: str, stock_code: str, report_type: str, period: str,
-        source: str = ""
+        market: str, stock_code: str, report_type: str, period: str, source: str = ""
     ) -> str:
         """
         生成缓存键
@@ -222,10 +221,7 @@ class FinancialCache:
         Returns:
             int: 删除的缓存数量
         """
-        keys_to_delete = [
-            k for k in self._cache.keys()
-            if stock_code in k
-        ]
+        keys_to_delete = [k for k in self._cache.keys() if stock_code in k]
         for key in keys_to_delete:
             del self._cache[key]
         return len(keys_to_delete)
