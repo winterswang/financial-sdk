@@ -568,24 +568,41 @@ class HKAdapter(BaseAdapter):
                     df["current_assets"] = df["total_assets"] - df["non_current_assets"]
 
         # 推算 current_liabilities
-        if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
+        if (
+            "current_liabilities" not in df.columns
+            or df["current_liabilities"].isna().all()
+        ):
             for orig, mapped in bs_mapping.items():
                 if mapped == "current_liabilities" and orig in df.columns:
                     df["current_liabilities"] = df[orig]
                     break
-            if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
-                if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
-                    df["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+            if (
+                "current_liabilities" not in df.columns
+                or df["current_liabilities"].isna().all()
+            ):
+                if (
+                    "total_liabilities" in df.columns
+                    and "non_current_liabilities" in df.columns
+                ):
+                    df["current_liabilities"] = (
+                        df["total_liabilities"] - df["non_current_liabilities"]
+                    )
 
         # 推算 non_current_assets: 优先使用映射的字段
-        if "non_current_assets" not in df.columns or df["non_current_assets"].isna().all():
+        if (
+            "non_current_assets" not in df.columns
+            or df["non_current_assets"].isna().all()
+        ):
             for orig, mapped in bs_mapping.items():
                 if mapped == "non_current_assets" and orig in df.columns:
                     df["non_current_assets"] = df[orig]
                     break
 
         # 推算 non_current_liabilities
-        if "non_current_liabilities" not in df.columns or df["non_current_liabilities"].isna().all():
+        if (
+            "non_current_liabilities" not in df.columns
+            or df["non_current_liabilities"].isna().all()
+        ):
             for orig, mapped in bs_mapping.items():
                 if mapped == "non_current_liabilities" and orig in df.columns:
                     df["non_current_liabilities"] = df[orig]

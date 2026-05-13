@@ -11,6 +11,10 @@ import pandas as pd
 
 from .exceptions import DataFormatError
 
+import logging
+
+_logger = logging.getLogger(__name__)
+
 
 class BaseAdapter(ABC):
     """
@@ -209,8 +213,12 @@ class BaseAdapter(ABC):
         df = df.copy()
         # 跳过元数据列
         skip_cols = {
-            "report_date", "stock_code", "stock_name",
-            "_raw_data_source", "_raw_field_names", "_derived_fields",
+            "report_date",
+            "stock_code",
+            "stock_name",
+            "_raw_data_source",
+            "_raw_field_names",
+            "_derived_fields",
         }
 
         for col in df.columns:
@@ -251,8 +259,12 @@ class BaseAdapter(ABC):
 
         # 元数据列，始终保留
         meta_cols = {
-            "report_date", "stock_code", "stock_name",
-            "_raw_data_source", "_raw_field_names", "_derived_fields",
+            "report_date",
+            "stock_code",
+            "stock_name",
+            "_raw_data_source",
+            "_raw_field_names",
+            "_derived_fields",
         }
 
         # 动态收集的额外标准字段（从 models 常量中获取完整集合）
@@ -263,6 +275,7 @@ class BaseAdapter(ABC):
                 CASH_FLOW_STANDARD_FIELDS,
                 INDICATORS_STANDARD_FIELDS,
             )
+
             full_sets = {
                 "balance_sheet": BALANCE_SHEET_STANDARD_FIELDS,
                 "income_statement": INCOME_STATEMENT_STANDARD_FIELDS,
@@ -271,16 +284,18 @@ class BaseAdapter(ABC):
             }
             standard_fields = standard_fields | full_sets.get(report_type, set())
         except ImportError:
-            pass
+            _logger.warning(
+                f"[{self.adapter_name}] _trim_unmapped_columns: "
+                f"STANDARD_FIELDS constants not found in models.py for {report_type}, "
+                f"falling back to required fields only"
+            )
 
         # 保留在标准字段集或元数据列中的列
         keep_cols = [c for c in df.columns if c in standard_fields or c in meta_cols]
 
         if len(keep_cols) < len(df.columns):
             dropped = set(df.columns) - set(keep_cols)
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.debug(
+            _logger.debug(
                 f"[{self.adapter_name}] {report_type}: trimmed {len(dropped)} unmapped columns, "
                 f"kept {len(keep_cols)}/{len(df.columns)}. Dropped: {sorted(list(dropped))[:10]}..."
             )

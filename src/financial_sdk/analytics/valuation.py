@@ -196,6 +196,7 @@ class ValuationAnalyzer(BaseAnalyzer):
 
         # 判断市场
         from ..adapter_manager import get_adapter_manager
+
         market = get_adapter_manager().get_market_for_stock(stock_code)
 
         # 获取关键财务指标
@@ -301,7 +302,9 @@ class ValuationAnalyzer(BaseAnalyzer):
         pb_ratio = self._calculator.calculate_pb_ratio(
             current_price, total_equity, shares
         )
-        ps_ratio = self._calculator.calculate_ps_ratio(current_price, revenue, shares, market_cap)
+        ps_ratio = self._calculator.calculate_ps_ratio(
+            current_price, revenue, shares, market_cap
+        )
         ev_ebitda = self._calculator.calculate_ev_ebitda(
             market_cap, total_debt, cash, ebitda
         )
@@ -396,7 +399,9 @@ class ValuationAnalyzer(BaseAnalyzer):
 
         return "CNY"
 
-    def _get_exchange_rate(self, from_currency: str, to_currency: str) -> Optional[float]:
+    def _get_exchange_rate(
+        self, from_currency: str, to_currency: str
+    ) -> Optional[float]:
         """
         获取汇率（带TTL缓存）
 
@@ -421,6 +426,7 @@ class ValuationAnalyzer(BaseAnalyzer):
 
         try:
             import akshare as ak
+
             # 使用 currency_boc_safe 获取中行汇率 (更稳定)
             df = ak.currency_boc_safe()
             if df is not None and not df.empty:
@@ -447,15 +453,15 @@ class ValuationAnalyzer(BaseAnalyzer):
                         _exchange_rate_cache[reverse_key] = (reverse_rate, now)
                     return rate
         except Exception as e:
-            logger.warning(f"Failed to get exchange rate {from_currency}->{to_currency}: {e}")
+            logger.warning(
+                f"Failed to get exchange rate {from_currency}->{to_currency}: {e}"
+            )
 
         # 备用汇率（带标注日期）
         entry = _FALLBACK_RATES.get(cache_key)
         if entry:
             rate, date_str = entry
-            logger.warning(
-                f"使用备用汇率 {cache_key}={rate} (数据日期: {date_str})"
-            )
+            logger.warning(f"使用备用汇率 {cache_key}={rate} (数据日期: {date_str})")
             _exchange_rate_cache[cache_key] = (rate, now)
             return rate
         return None
@@ -575,7 +581,9 @@ class ValuationAnalyzer(BaseAnalyzer):
             price_healthy = False
 
         facade_healthy = result["status"] == "healthy"
-        result["status"] = "healthy" if (facade_healthy and price_healthy) else "degraded"
+        result["status"] = (
+            "healthy" if (facade_healthy and price_healthy) else "degraded"
+        )
         result["components"] = {
             "price_provider": "healthy" if price_healthy else "unhealthy",
             "financial_facade": "healthy" if facade_healthy else "unhealthy",

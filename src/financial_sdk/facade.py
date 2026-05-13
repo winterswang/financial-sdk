@@ -51,11 +51,17 @@ class FinancialFacade:
     # 支持的市场
     MARKET_TYPES: Set[str] = {"A", "HK", "US", "all"}
 
+    # OOM 防护默认值
+    DEFAULT_MEMORY_THRESHOLD = 500  # 总行数阈值
+    DEFAULT_MAX_YEARS = 10  # 截断时保留最近N年
+
     def __init__(
         self,
         config_path: Optional[str] = None,
         cache_size: int = 1000,
         enable_cache: bool = True,
+        memory_threshold: int = DEFAULT_MEMORY_THRESHOLD,
+        max_years: int = DEFAULT_MAX_YEARS,
     ) -> None:
         """
         初始化FinancialFacade
@@ -64,17 +70,21 @@ class FinancialFacade:
             config_path: 配置文件路径
             cache_size: 缓存大小
             enable_cache: 是否启用缓存
+            memory_threshold: OOM防护行数阈值，总行数超过此值触发截断
+            max_years: 截断时保留最近N年数据
         """
         self._adapter_manager = get_adapter_manager()
         if enable_cache:
             self._cache = get_cache()
             # 同步缓存大小设置
-            if hasattr(self._cache, '_max_size') and self._cache._max_size < cache_size:
+            if hasattr(self._cache, "_max_size") and self._cache._max_size < cache_size:
                 self._cache._max_size = cache_size
         else:
             self._cache = FinancialCache(max_size=cache_size)
         self._monitor = get_monitor()
         self._enable_cache = enable_cache
+        self._memory_threshold = memory_threshold
+        self._max_years = max_years
 
     def get_financial_data(
         self,
@@ -191,6 +201,10 @@ class FinancialFacade:
                     warnings.append(f"{rtype}获取异常: {str(e)}")
                     is_partial = True
 
+        # Issue #10 fix: 跨报表 fallback 计算
+        # income_statement 的 roe 可能为空，但有 net_profit + balance_sheet 的 total_equity
+        self._cross_report_fallback(bundle)
+
         # 更新bundle状态
         bundle.warnings = warnings
         bundle.is_partial = is_partial
@@ -221,40 +235,78 @@ class FinancialFacade:
 
         return bundle
 
-    @staticmethod
-    def _check_bundle_memory(bundle: FinancialBundle, stock_code: str) -> None:
+    def _check_bundle_memory(self, bundle: FinancialBundle, stock_code: str) -> None:
         """
-        OOM 防护：检查 bundle 内存占用
+        OOM 防护：检查 bundle 内存占用，主动截断过大 DataFrame
 
-        当所有报表总行数超过阈值时，记录 warning 建议分批拉取。
+        当所有报表总行数超过阈值时，truncate 每个 DataFrame 保留最近 N 年数据，
+        并在 bundle.warnings 中记录截断信息。
 
         Args:
             bundle: 财务数据包
             stock_code: 股票代码
         """
         import logging
+        import warnings as _warnings
+
         logger = logging.getLogger(__name__)
 
         total_rows = 0
-        for attr in ["balance_sheet", "income_statement", "cash_flow", "indicators"]:
+        report_attrs = ["balance_sheet", "income_statement", "cash_flow", "indicators"]
+        for attr in report_attrs:
             df = getattr(bundle, attr, None)
-            if df is not None and not (hasattr(df, 'empty') and df.empty):
+            if df is not None and not (hasattr(df, "empty") and df.empty):
                 total_rows += len(df)
 
-        # 单报表超过 200 行 或 总计超过 500 行时警告
-        for attr in ["balance_sheet", "income_statement", "cash_flow", "indicators"]:
-            df = getattr(bundle, attr, None)
-            if df is not None and len(df) > 200:
-                logger.warning(
-                    f"OOM 风险: {stock_code} {attr} 返回 {len(df)} 行，"
-                    f"建议用 report_type='{attr}' 单独拉取以降低内存"
-                )
+        if total_rows <= self._memory_threshold:
+            return
 
-        if total_rows > 500:
-            logger.warning(
-                f"OOM 风险: {stock_code} all reports 总计 {total_rows} 行，"
-                f"建议按 report_type 分批拉取或使用 max_years 限制年份"
-            )
+        # 主动截断：保留最近 N 年
+        max_years = self._max_years
+        for attr in report_attrs:
+            df = getattr(bundle, attr, None)
+            if df is None or (hasattr(df, "empty") and df.empty):
+                continue
+            if "report_date" not in df.columns:
+                # 无日期列，保留最后 max_years 行
+                if len(df) > max_years:
+                    original_len = len(df)
+                    setattr(bundle, attr, df.tail(max_years).copy())
+                    msg = (
+                        f"OOM 截断: {stock_code} {attr} 无 report_date，"
+                        f"保留最近 {max_years} 行 (原 {original_len} 行)"
+                    )
+                    logger.warning(msg)
+                    bundle.warnings.append(msg)
+                continue
+
+            # 按年份截断
+            try:
+                dates = pd.to_datetime(df["report_date"], errors="coerce")
+                latest_year = dates.dt.year.max()
+                if pd.isna(latest_year):
+                    continue
+                cutoff_year = latest_year - max_years + 1
+                mask = dates.dt.year >= cutoff_year
+                if mask.sum() < len(df):
+                    original_len = len(df)
+                    setattr(bundle, attr, df[mask].copy())
+                    kept = mask.sum()
+                    msg = (
+                        f"OOM 截断: {stock_code} {attr} 保留 {cutoff_year}+ 年数据 "
+                        f"({kept}/{original_len} 行)"
+                    )
+                    logger.warning(msg)
+                    bundle.warnings.append(msg)
+            except Exception as e:
+                logger.warning(f"OOM 截断失败: {stock_code} {attr}: {e}")
+
+        # 发出 Python warning
+        _warnings.warn(
+            f"{stock_code}: bundle 总行数 {total_rows} 超过阈值 {self._memory_threshold}，"
+            f"已截断至最近 {max_years} 年",
+            stacklevel=3,
+        )
 
     def _fetch_report(
         self, adapter, stock_code: str, report_type: str, period: str
@@ -335,6 +387,61 @@ class FinancialFacade:
             except Exception:
                 continue
         return None
+
+    def _cross_report_fallback(self, bundle: FinancialBundle) -> None:
+        """跨报表 fallback: 用已有字段推算缺失指标
+
+        Issue #10: 当 income_statement.roe 为空但 net_profit 和 total_equity 有值时，
+        自动计算 roe = net_profit / total_equity * 100。
+        同理 net_margin = net_profit / revenue * 100 (补充 income_statement 自愈未覆盖的场景)。
+        """
+        is_df = bundle.income_statement
+        bs_df = bundle.balance_sheet
+
+        if is_df is None or is_df.empty:
+            return
+
+        # 推算 net_margin (如果 income_statement 自愈未覆盖)
+        if (
+            "net_margin" in is_df.columns
+            and "net_profit" in is_df.columns
+            and "revenue" in is_df.columns
+        ):
+            mask = (
+                is_df["net_margin"].isna()
+                & is_df["net_profit"].notna()
+                & is_df["revenue"].notna()
+                & (is_df["revenue"] != 0)
+            )
+            if mask.any():
+                is_df.loc[mask, "net_margin"] = (
+                    is_df.loc[mask, "net_profit"] / is_df.loc[mask, "revenue"]
+                ) * 100
+                bundle.warnings.append(
+                    f"income_statement 自愈推算: net_margin = net_profit / revenue * 100 ({int(mask.sum())} rows)"
+                )
+
+        # 推算 roe: 需要 income_statement.net_profit + balance_sheet.total_equity
+        if "roe" in is_df.columns and bs_df is not None and not bs_df.empty:
+            if "net_profit" in is_df.columns and "total_equity" in bs_df.columns:
+                # 按 report_date 对齐
+                if "report_date" in is_df.columns and "report_date" in bs_df.columns:
+                    roe_mask = is_df["roe"].isna()
+                    if roe_mask.any():
+                        equity_map = bs_df.set_index("report_date")[
+                            "total_equity"
+                        ].to_dict()
+                        for idx in is_df[roe_mask].index:
+                            date = is_df.loc[idx, "report_date"]
+                            equity = equity_map.get(date)
+                            np_val = is_df.loc[idx, "net_profit"]
+                            if equity and np_val and equity != 0:
+                                is_df.loc[idx, "roe"] = (np_val / equity) * 100
+                        filled = roe_mask & is_df["roe"].notna()
+                        if filled.any():
+                            bundle.warnings.append(
+                                f"income_statement 自愈推算: roe = net_profit / total_equity * 100 ({int(filled.sum())} rows)"
+                            )
 
     def _get_report_types_to_fetch(self, report_type: str) -> List[str]:
         """

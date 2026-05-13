@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from ..facade import FinancialFacade  # noqa: F401
 
 
-
 @dataclass
 class EfficiencyMetrics:
     """

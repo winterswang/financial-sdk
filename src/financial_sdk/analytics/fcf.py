@@ -124,16 +124,16 @@ class FCFMetrics:
         if val is None:
             return "N/A"
         if abs(val) >= 1e8:
-            return f"{val/1e8:.2f}亿"
+            return f"{val / 1e8:.2f}亿"
         elif abs(val) >= 1e4:
-            return f"{val/1e4:.2f}万"
+            return f"{val / 1e4:.2f}万"
         return f"{val:.2f}"
 
     @staticmethod
     def _format_pct(val: Optional[float]) -> str:
         if val is None:
             return "N/A"
-        return f"{val*100:.2f}%"
+        return f"{val * 100:.2f}%"
 
     @staticmethod
     def _format_ratio(val: Optional[float]) -> str:
@@ -229,16 +229,22 @@ class FCFAnalyzer(BaseAnalyzer):
             curr_balance = balance[balance["report_date"] == current_date]
 
             net_profit = self._get_value_from_df(curr_income, "net_profit")
-            operating_cash_flow = self._get_value_from_df(curr_cash_flow, "operating_cash_flow")
+            operating_cash_flow = self._get_value_from_df(
+                curr_cash_flow, "operating_cash_flow"
+            )
 
             # CapEx: 尝试多个字段名
             capex = self._get_value_from_df(curr_cash_flow, "capex")
             if capex is None:
                 capex = self._get_value_from_df(curr_cash_flow, "capital_expenditure")
             if capex is None:
-                capex = self._get_value_from_df(curr_cash_flow, "purchase_of_fixed_assets")
+                capex = self._get_value_from_df(
+                    curr_cash_flow, "purchase_of_fixed_assets"
+                )
             if capex is None:
-                capex = self._get_value_from_df(curr_cash_flow, "购建固定资产、无形资产和其他长期资产支付的现金")
+                capex = self._get_value_from_df(
+                    curr_cash_flow, "购建固定资产、无形资产和其他长期资产支付的现金"
+                )
 
             # FCF = OCF - CapEx (CapEx 取绝对值)
             fcf = None
@@ -269,7 +275,12 @@ class FCFAnalyzer(BaseAnalyzer):
 
             # Accrual Ratio = (Net Income - OCF) / Total Assets
             total_assets = self._get_value_from_df(curr_balance, "total_assets")
-            if net_profit is not None and operating_cash_flow is not None and total_assets and total_assets > 0:
+            if (
+                net_profit is not None
+                and operating_cash_flow is not None
+                and total_assets
+                and total_assets > 0
+            ):
                 accrual_ratio = (net_profit - operating_cash_flow) / total_assets
 
             # 趋势分析（如果有多年数据）
@@ -279,9 +290,13 @@ class FCFAnalyzer(BaseAnalyzer):
                 period_ocf = self._get_value_from_df(period_cf, "operating_cash_flow")
                 period_capex = self._get_value_from_df(period_cf, "capex")
                 if period_capex is None:
-                    period_capex = self._get_value_from_df(period_cf, "capital_expenditure")
+                    period_capex = self._get_value_from_df(
+                        period_cf, "capital_expenditure"
+                    )
                 if period_capex is None:
-                    period_capex = self._get_value_from_df(period_cf, "purchase_of_fixed_assets")
+                    period_capex = self._get_value_from_df(
+                        period_cf, "purchase_of_fixed_assets"
+                    )
 
                 if period_ocf is not None:
                     if period_capex is not None:
@@ -300,7 +315,9 @@ class FCFAnalyzer(BaseAnalyzer):
                 try:
                     years = min(len(fcf_series) - 1, 5)
                     if years > 0 and fcf_series[0] > 0 and fcf_series[-1] > 0:
-                        fcf_cagr_5y = (fcf_series[0] / fcf_series[-1]) ** (1 / years) - 1
+                        fcf_cagr_5y = (fcf_series[0] / fcf_series[-1]) ** (
+                            1 / years
+                        ) - 1
                 except (ZeroDivisionError, ValueError):
                     pass
 
@@ -314,7 +331,9 @@ class FCFAnalyzer(BaseAnalyzer):
                         # 稳定性评分: 波动性越低分数越高
                         # 波动性 < 0.2 -> 100分, > 1.0 -> 0分
                         fcf_volatility_clamped = min(max(fcf_volatility, 0.2), 1.0)
-                        fcf_stability_score = (1.0 - (fcf_volatility_clamped - 0.2) / 0.8) * 100
+                        fcf_stability_score = (
+                            1.0 - (fcf_volatility_clamped - 0.2) / 0.8
+                        ) * 100
                 except (ZeroDivisionError, ValueError):
                     pass
 
