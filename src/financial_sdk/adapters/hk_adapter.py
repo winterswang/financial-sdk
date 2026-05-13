@@ -12,6 +12,10 @@ from typing import Any, Dict, List, Optional
 import pandas as pd
 
 from ..base_adapter import BaseAdapter
+import logging
+
+logger = logging.getLogger(__name__)
+
 from ..exceptions import DataNotAvailableError, InvalidStockCodeError
 
 
@@ -541,6 +545,7 @@ class HKAdapter(BaseAdapter):
             self._get_akshare()
             return True
         except Exception:
+            logger.debug("AkShare HK availability check failed", exc_info=True)
             return False
 
     def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:

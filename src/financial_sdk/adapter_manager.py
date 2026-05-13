@@ -18,6 +18,10 @@ from .adapters import (
 from .exceptions import InvalidStockCodeError, NoAdapterAvailableError
 from .monitor import FallbackStep, get_monitor
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class AdapterManager:
     """
@@ -52,7 +56,7 @@ class AdapterManager:
             lb_adapter = LongbridgeCLIAdapter()
             self.register_adapter(lb_adapter)
         except Exception:
-            pass  # CLI 不可用时跳过
+            logger.debug("LongBridge CLI not available, skipping", exc_info=True)
 
         # A股适配器
         ashare_adapter = ASHareAdapter()

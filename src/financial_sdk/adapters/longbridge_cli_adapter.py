@@ -218,6 +218,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                         self._cli_path = path
                         break
                 except Exception:
+                    logger.debug("CLI path check failed", exc_info=True)
                     continue
 
         if self._cli_path is None:
@@ -307,6 +308,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             )
             return result.returncode == 0
         except Exception:
+            logger.debug("CLI availability check failed", exc_info=True)
             return False
 
     def _run_command(self, args: List[str]) -> Dict[str, Any]:
@@ -424,6 +426,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
             return str(ts)
         except Exception:
+            logger.debug("Date parsing failed", exc_info=True)
             return str(ts)
 
     def get_balance_sheet(
@@ -666,6 +669,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return self._pivot_to_wide(df)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def _pivot_to_wide(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -892,6 +896,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return pd.DataFrame(records)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def get_dividend(self, stock_code: str) -> pd.DataFrame:
@@ -933,6 +938,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return pd.DataFrame(records)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def get_institution_rating(self, stock_code: str) -> pd.DataFrame:
@@ -983,6 +989,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return pd.DataFrame(records)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def get_valuation(self, stock_code: str) -> pd.DataFrame:
@@ -1034,6 +1041,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return df_pivot.reset_index()
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def get_fund_holder(self, stock_code: str, count: int = 20) -> pd.DataFrame:
@@ -1079,6 +1087,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return pd.DataFrame(records)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def get_shareholder(self, stock_code: str, range_: str = "all") -> pd.DataFrame:
@@ -1123,6 +1132,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return pd.DataFrame(records)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def get_quote(self, stock_code: str) -> Dict[str, Any]:
@@ -1219,6 +1229,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
                 return pd.DataFrame(records)
             return pd.DataFrame()
         except Exception:
+            logger.debug("Data fetch failed, returning empty DataFrame", exc_info=True)
             return pd.DataFrame()
 
     def health_check(self) -> Dict[str, Any]:

@@ -12,6 +12,10 @@ from typing import Any, Dict, List, Optional, Set
 import pandas as pd
 
 from ..base_adapter import BaseAdapter
+import logging
+
+logger = logging.getLogger(__name__)
+
 from ..exceptions import DataNotAvailableError, InvalidStockCodeError
 
 
@@ -623,4 +627,5 @@ class ASHareAdapter(BaseAdapter):
             self._get_akshare()
             return True
         except Exception:
+            logger.debug("AkShare availability check failed", exc_info=True)
             return False
