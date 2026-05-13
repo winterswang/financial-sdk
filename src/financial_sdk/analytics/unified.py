@@ -96,7 +96,7 @@ class FullAnalysisReport:
         Returns:
             综合评分
         """
-        score = 50.0  # 基础分
+        score = 60.0  # 基础分
         available_dims = sum(
             1
             for m in [
