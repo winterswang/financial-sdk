@@ -704,10 +704,8 @@ class LongbridgeCLIAdapter(BaseAdapter):
         """
         资产负债表数据自愈: 从已有字段推算缺失的标准字段
 
-        推算规则:
-        - total_equity = total_assets - total_liabilities (缺失时)
-        - bvps = total_equity / share_capital (缺失时)
-        - debt_to_equity = total_liabilities / total_equity (缺失时)
+        LongBridge specific: bvps, debt_to_equity, net_debt, short/long_term_debt.
+        公共字段 (total_equity, current_assets/liabilities 等) 由 BaseAdapter 处理.
 
         Args:
             df: 宽格式 DataFrame
@@ -718,42 +716,31 @@ class LongbridgeCLIAdapter(BaseAdapter):
         if df.empty:
             return df
 
+        # 1. 先调用基类处理公共字段
+        df = super()._fill_balance_derived(df)
+
         derived_fields = []
+        new_cols = {}
 
-        # 推算 total_equity
-        if "total_equity" not in df.columns or df["total_equity"].isna().all():
-            if "total_assets" in df.columns and "total_liabilities" in df.columns:
-                df["total_equity"] = df["total_assets"] - df["total_liabilities"]
-                derived_fields.append("total_equity = total_assets - total_liabilities")
-
-        # 推算 bvps = total_equity / share_capital
+        # 2. LongBridge specific: bvps = total_equity / share_capital
         if "bvps" not in df.columns or df["bvps"].isna().all():
             if "total_equity" in df.columns and "share_capital" in df.columns:
                 mask = df["share_capital"].notna() & (df["share_capital"] != 0)
-                df.loc[mask, "bvps"] = (
-                    df.loc[mask, "total_equity"] / df.loc[mask, "share_capital"]
-                )
+                vals = pd.Series(index=df.index, dtype=float)
+                vals[mask] = df.loc[mask, "total_equity"] / df.loc[mask, "share_capital"]
+                new_cols["bvps"] = vals
                 derived_fields.append("bvps = total_equity / share_capital")
 
-        # 推算 debt_to_equity = total_liabilities / total_equity
+        # 3. debt_to_equity = total_liabilities / total_equity
         if "debt_to_equity" not in df.columns or df["debt_to_equity"].isna().all():
             if "total_liabilities" in df.columns and "total_equity" in df.columns:
                 mask = df["total_equity"].notna() & (df["total_equity"] != 0)
-                df.loc[mask, "debt_to_equity"] = (
-                    df.loc[mask, "total_liabilities"] / df.loc[mask, "total_equity"]
-                )
-                derived_fields.append(
-                    "debt_to_equity = total_liabilities / total_equity"
-                )
+                vals = pd.Series(index=df.index, dtype=float)
+                vals[mask] = df.loc[mask, "total_liabilities"] / df.loc[mask, "total_equity"]
+                new_cols["debt_to_equity"] = vals
+                derived_fields.append("debt_to_equity = total_liabilities / total_equity")
 
-        # 记录推算信息
-        if derived_fields:
-            df["_derived_fields"] = "; ".join(derived_fields)
-            for field in derived_fields:
-                logger.info("Data self-healing: derived %s", field)
-
-        # === 美股/港股补全: 从已知字段推算缺失的标准字段 ===
-        # 非流动资产 = 已知非流动资产组分之和，或 total_assets - 已知流动资产组分
+        # 4. non_current_assets = total_assets - sum(known current asset components)
         if "non_current_assets" not in df.columns or df["non_current_assets"].isna().all():
             if "total_assets" in df.columns:
                 known_current = []
@@ -762,64 +749,68 @@ class LongbridgeCLIAdapter(BaseAdapter):
                         known_current.append(df[col].fillna(0))
                 if known_current:
                     estimated_current = sum(known_current)
-                    df["non_current_assets"] = df["total_assets"] - estimated_current
+                    new_cols["non_current_assets"] = df["total_assets"] - estimated_current
                     derived_fields.append("non_current_assets = total_assets - sum(known_current_assets)")
 
-        # 流动资产 = 总资产 - 非流动资产
+        # 5. current_assets = total_assets - non_current_assets (if non_current just derived or exists)
         if "current_assets" not in df.columns or df["current_assets"].isna().all():
-            if "total_assets" in df.columns and "non_current_assets" in df.columns:
-                df["current_assets"] = df["total_assets"] - df["non_current_assets"]
+            nca = new_cols.get("non_current_assets") or (df["non_current_assets"] if "non_current_assets" in df.columns else None)
+            if "total_assets" in df.columns and nca is not None:
+                new_cols["current_assets"] = df["total_assets"] - nca
                 derived_fields.append("current_assets = total_assets - non_current_assets")
 
-        # 非流动负债 = 总负债 - 流动负债（如果有流动负债）
+        # 6. non_current_liabilities = total_liabilities - current_liabilities
         if "non_current_liabilities" not in df.columns or df["non_current_liabilities"].isna().all():
             if "total_liabilities" in df.columns and "current_liabilities" in df.columns:
-                df["non_current_liabilities"] = df["total_liabilities"] - df["current_liabilities"]
+                new_cols["non_current_liabilities"] = df["total_liabilities"] - df["current_liabilities"]
 
-        # 流动负债 = 总负债 - 非流动负债（如果有非流动负债）
-        # 注意：这里先设为待定，后面有息负债推算完成后会再尝试
+        # 7. current_liabilities = total_liabilities - non_current_liabilities
         _current_liabilities_pending = True
         if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
-            if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
-                df["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+            ncl = new_cols.get("non_current_liabilities") or (df["non_current_liabilities"] if "non_current_liabilities" in df.columns else None)
+            if "total_liabilities" in df.columns and ncl is not None:
+                new_cols["current_liabilities"] = df["total_liabilities"] - ncl
                 derived_fields.append("current_liabilities = total_liabilities - non_current_liabilities")
                 _current_liabilities_pending = False
 
-        # 有息负债推算: total_debt = net_debt + cash_and_equivalents
-        # net_debt为负表示现金>有息负债，此时total_debt应=0或为极小值
+        # 8. 有息负债推算: total_debt = net_debt + cash_and_equivalents
         if "net_debt" in df.columns and "cash_and_equivalents" in df.columns:
             total_debt = df["net_debt"].fillna(0) + df["cash_and_equivalents"].fillna(0)
-            # net_debt为负表示净现金状态，有息负债可能为0
             total_debt = total_debt.clip(lower=0)
 
             # 短期债务
             if "short_term_debt" not in df.columns or df["short_term_debt"].isna().all():
-                df["short_term_debt"] = 0.0
+                new_cols["short_term_debt"] = 0.0
                 derived_fields.append("short_term_debt = 0 (no short-term debt data)")
 
             # 长期债务 = total_debt - short_term_debt
             if "long_term_debt" not in df.columns or df["long_term_debt"].isna().all():
-                df["long_term_debt"] = total_debt - df["short_term_debt"].fillna(0)
+                std = new_cols.get("short_term_debt")
+                if std is None and "short_term_debt" in df.columns:
+                    std = df["short_term_debt"]
+                new_cols["long_term_debt"] = total_debt - (std.fillna(0) if hasattr(std, 'fillna') else std)
                 derived_fields.append("long_term_debt = net_debt + cash - short_term_debt")
 
-        # 非流动负债推算: 如果有total_liabilities和current_liabilities
-        if "non_current_liabilities" not in df.columns or df["non_current_liabilities"].isna().all():
+        # 9. 再次尝试 non_current_liabilities (if not yet derived)
+        if "non_current_liabilities" not in df.columns and "non_current_liabilities" not in new_cols:
             if "total_liabilities" in df.columns and "current_liabilities" in df.columns:
-                df["non_current_liabilities"] = df["total_liabilities"] - df["current_liabilities"]
+                new_cols["non_current_liabilities"] = df["total_liabilities"] - df["current_liabilities"]
 
-        # 再次尝试推算 current_liabilities（此时 long_term_debt 已可用）
-        if _current_liabilities_pending and ("current_liabilities" not in df.columns or df["current_liabilities"].isna().all()):
+        # 10. 再次尝试 current_liabilities (此时 long_term_debt 已可用)
+        if _current_liabilities_pending and ("current_liabilities" not in df.columns and "current_liabilities" not in new_cols):
             if "total_liabilities" in df.columns and "long_term_debt" in df.columns:
-                # long_term_debt 只是有息负债，非流动负债还可能包含递延税等
-                # 但对于低负债公司，这是合理的近似
-                df["current_liabilities"] = df["total_liabilities"] - df["long_term_debt"].fillna(0)
-                # 确保不为负
-                df["current_liabilities"] = df["current_liabilities"].clip(lower=0)
+                new_cols["current_liabilities"] = (df["total_liabilities"] - df["long_term_debt"].fillna(0)).clip(lower=0)
                 derived_fields.append("current_liabilities ≈ total_liabilities - long_term_debt (approx)")
 
-        # 更新derived_fields记录
+        # Batch-assign all new columns at once
+        if new_cols:
+            df = df.assign(**new_cols)
+
+        # Record derived fields for observability
         if derived_fields:
             df["_derived_fields"] = "; ".join(derived_fields)
+            for field in derived_fields:
+                logger.info("Data self-healing: derived %s", field)
 
         return df
 

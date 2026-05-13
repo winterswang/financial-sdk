@@ -234,11 +234,14 @@ class ASHareAdapter(BaseAdapter):
         if yoy_cols:
             df = df.drop(columns=yoy_cols)
 
-        # 添加原始数据源标识
-        df["_raw_data_source"] = self.adapter_name
+        # Defragment DataFrame before adding columns (pandas PerformanceWarning fix)
+        df = df.copy()
 
-        # 记录原始字段映射
-        df["_raw_field_names"] = str({v: k for k, v in renamed_columns.items()})
+        # 添加原始数据源标识和字段映射 (batch-assign)
+        df = df.assign(
+            _raw_data_source=self.adapter_name,
+            _raw_field_names=str({v: k for k, v in renamed_columns.items()}),
+        )
 
         return df
 
@@ -526,17 +529,21 @@ class ASHareAdapter(BaseAdapter):
         return result_df
 
     def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:
-        """资产负债表数据自愈: 推算缺失的标准字段"""
+        """资产负债表数据自愈: 推算缺失的标准字段
+        
+        A-share specific: 从 AkShare 原始字段汇总推算 current_assets,
+        current_liabilities, inventory, accounts_payable.
+        公共字段 (total_equity 等) 由 BaseAdapter 处理.
+        """
         if df is None or df.empty:
             return df
 
-        # 推算 total_equity = total_assets - total_liabilities
-        if "total_equity" not in df.columns or df["total_equity"].isna().all():
-            if "total_assets" in df.columns and "total_liabilities" in df.columns:
-                df["total_equity"] = df["total_assets"] - df["total_liabilities"]
+        # 1. 先调用基类处理公共字段 (total_equity, current_assets/liabilities 等)
+        df = super()._fill_balance_derived(df)
 
-        # 推算 current_assets: 尝试从各流动资产字段汇总
-        # AkShare A股报表包含大量流动资产/负债字段，尝试汇总
+        new_cols = {}
+
+        # 2. A-share specific: current_assets 从 AkShare 原始字段汇总
         if "current_assets" not in df.columns or df["current_assets"].isna().all():
             current_asset_fields = [
                 "CASH_DEPOSIT_PBC", "DEPOSIT_INTERBANK", "PRECIOUS_METAL", "LEND_FUND",
@@ -548,14 +555,11 @@ class ASHareAdapter(BaseAdapter):
                 "SHORT_TERM_INVEST", "NOTE_RECE", "INVENTORY", "ADVANCE_PAYMENT",
                 "DIVIDEND_RECE", "OTHER_CURRENT_ASSET", "TOTAL_CURRENT_ASSETS",
             ]
-            sum_expr = df[current_asset_fields[0]]
-            for field in current_asset_fields[1:]:
-                if field in df.columns:
-                    sum_expr = sum_expr + df[field].fillna(0)
-            if "current_assets" not in df.columns:
-                df["current_assets"] = sum_expr
+            available = [f for f in current_asset_fields if f in df.columns]
+            if available:
+                new_cols["current_assets"] = sum(df[f].fillna(0) for f in available)
 
-        # 推算 current_liabilities: 尝试从各流动负债字段汇总
+        # 3. A-share specific: current_liabilities 从 AkShare 原始字段汇总
         if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
             current_liab_fields = [
                 "SHORT_LOAN", "TRADE_FINLIAB_NOTFVTPL", "FVTPL_FINLIAB", "TRADE_FINLIAB",
@@ -565,32 +569,32 @@ class ASHareAdapter(BaseAdapter):
                 "PREDICT_LIAB", "AMORTIZE_COST_FINLIAB", "HOLDSALE_LIAB", "SHORT_FIN_PAYABLE",
                 "ACCRUED_EXPENSE", "NOTE_PAYABLE", "TOTAL_CURRENT_LIAB",
             ]
-            sum_expr = df[current_liab_fields[0]]
-            for field in current_liab_fields[1:]:
-                if field in df.columns:
-                    sum_expr = sum_expr + df[field].fillna(0)
-            if "current_liabilities" not in df.columns:
-                df["current_liabilities"] = sum_expr
+            available = [f for f in current_liab_fields if f in df.columns]
+            if available:
+                new_cols["current_liabilities"] = sum(df[f].fillna(0) for f in available)
 
-        # 推算 inventory: 尝试从存货相关字段
+        # 4. inventory: 尝试从存货相关字段
         if "inventory" not in df.columns or df["inventory"].isna().all():
             inv_fields = ["INVENTORY", "PEND_MORTGAGE_ASSET", "MORTGAGE_ASSET_IMPAIRMENT",
                          "NET_PENDMORTGAGE_ASSET", "HOLDSALE_ASSET"]
             for field in inv_fields:
                 if field in df.columns and not df[field].isna().all():
-                    df["inventory"] = df[field].fillna(0)
+                    new_cols["inventory"] = df[field].fillna(0)
                     break
 
-        # 推算 accounts_payable: 尝试从应付相关字段
+        # 5. accounts_payable: 尝试从应付相关字段
         if "accounts_payable" not in df.columns or df["accounts_payable"].isna().all():
             ap_fields = ["ACCOUNTS_PAYABLE", "NOTE_PAYABLE"]
             for field in ap_fields:
                 if field in df.columns and not df[field].isna().all():
-                    df["accounts_payable"] = df[field].fillna(0)
+                    new_cols["accounts_payable"] = df[field].fillna(0)
                     break
 
-        return df
+        # Batch-assign to avoid DataFrame fragmentation
+        if new_cols:
+            df = df.assign(**new_cols)
 
+        return df
     def _fill_income_derived(self, df: pd.DataFrame) -> pd.DataFrame:
         """利润表数据自愈: 推算缺失的标准字段"""
         if df is None or df.empty:

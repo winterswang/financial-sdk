@@ -230,11 +230,14 @@ class USAdapter(BaseAdapter):
 
         df = df.rename(columns=renamed_columns)
 
-        # 添加原始数据源标识
-        df["_raw_data_source"] = self.adapter_name
+        # Defragment DataFrame before adding columns (pandas PerformanceWarning fix)
+        df = df.copy()
 
-        # 记录原始字段映射
-        df["_raw_field_names"] = str({v: k for k, v in renamed_columns.items()})
+        # 添加原始数据源标识和字段映射 (batch-assign)
+        df = df.assign(
+            _raw_data_source=self.adapter_name,
+            _raw_field_names=str({v: k for k, v in renamed_columns.items()}),
+        )
 
         return df
 
@@ -291,7 +294,7 @@ class USAdapter(BaseAdapter):
         )
 
         # 添加原始数据源标识
-        pivot_df["_raw_data_source"] = self.adapter_name
+        pivot_df = pivot_df.assign(_raw_data_source=self.adapter_name)
 
         return pivot_df
 

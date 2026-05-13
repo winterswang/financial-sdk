@@ -278,11 +278,14 @@ class HKAdapter(BaseAdapter):
 
         df = df.rename(columns=renamed_columns)
 
-        # 添加原始数据源标识
-        df["_raw_data_source"] = self.adapter_name
+        # Defragment DataFrame before adding columns (pandas PerformanceWarning fix)
+        df = df.copy()
 
-        # 记录原始字段映射
-        df["_raw_field_names"] = str({v: k for k, v in renamed_columns.items()})
+        # 添加原始数据源标识和字段映射 (batch-assign)
+        df = df.assign(
+            _raw_data_source=self.adapter_name,
+            _raw_field_names=str({v: k for k, v in renamed_columns.items()}),
+        )
 
         return df
 
@@ -342,7 +345,7 @@ class HKAdapter(BaseAdapter):
         )
 
         # 添加原始数据源标识
-        pivot_df["_raw_data_source"] = self.adapter_name
+        pivot_df = pivot_df.assign(_raw_data_source=self.adapter_name)
 
         return pivot_df
 
@@ -549,69 +552,72 @@ class HKAdapter(BaseAdapter):
             return False
 
     def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:
-        """资产负债表数据自愈: 推算缺失的标准字段"""
+        """资产负债表数据自愈: 推算缺失的标准字段
+        
+        HK specific: 从字段映射回查原始列名推算 non_current_assets/liabilities,
+        inventory, accounts_payable.
+        公共字段 (total_equity, current_assets/liabilities) 由 BaseAdapter 处理.
+        """
         if df is None or df.empty:
             return df
 
+        # 1. 先调用基类处理公共字段
+        df = super()._fill_balance_derived(df)
+
         bs_mapping = self._field_mapping.get("balance_sheet", {})
+        new_cols = {}
 
-        # 推算 total_equity = total_assets - total_liabilities
-        if "total_equity" not in df.columns or df["total_equity"].isna().all():
-            if "total_assets" in df.columns and "total_liabilities" in df.columns:
-                df["total_equity"] = df["total_assets"] - df["total_liabilities"]
-
-        # 推算 current_assets: 优先使用映射的字段
-        if "current_assets" not in df.columns or df["current_assets"].isna().all():
-            # 从原始列名映射中查找
-            for orig, mapped in bs_mapping.items():
-                if mapped == "current_assets" and orig in df.columns:
-                    df["current_assets"] = df[orig]
-                    break
-            # 或者从 total_assets - non_current_assets 计算
-            if "current_assets" not in df.columns or df["current_assets"].isna().all():
-                if "total_assets" in df.columns and "non_current_assets" in df.columns:
-                    df["current_assets"] = df["total_assets"] - df["non_current_assets"]
-
-        # 推算 current_liabilities
-        if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
-            for orig, mapped in bs_mapping.items():
-                if mapped == "current_liabilities" and orig in df.columns:
-                    df["current_liabilities"] = df[orig]
-                    break
-            if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
-                if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
-                    df["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
-
-        # 推算 non_current_assets: 优先使用映射的字段
+        # 2. HK specific: non_current_assets 从映射查找
         if "non_current_assets" not in df.columns or df["non_current_assets"].isna().all():
             for orig, mapped in bs_mapping.items():
                 if mapped == "non_current_assets" and orig in df.columns:
-                    df["non_current_assets"] = df[orig]
+                    new_cols["non_current_assets"] = df[orig]
                     break
 
-        # 推算 non_current_liabilities
+        # 3. non_current_liabilities 从映射查找
         if "non_current_liabilities" not in df.columns or df["non_current_liabilities"].isna().all():
             for orig, mapped in bs_mapping.items():
                 if mapped == "non_current_liabilities" and orig in df.columns:
-                    df["non_current_liabilities"] = df[orig]
+                    new_cols["non_current_liabilities"] = df[orig]
                     break
 
-        # 推算 inventory: 优先使用映射的字段
+        # 4. current_assets: 优先映射查找，其次 total - non_current
+        if "current_assets" not in df.columns or df["current_assets"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "current_assets" and orig in df.columns:
+                    new_cols["current_assets"] = df[orig]
+                    break
+            if "current_assets" not in new_cols and "total_assets" in df.columns and "non_current_assets" in df.columns:
+                new_cols["current_assets"] = df["total_assets"] - df["non_current_assets"]
+
+        # 5. current_liabilities: 优先映射查找，其次 total - non_current
+        if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
+            for orig, mapped in bs_mapping.items():
+                if mapped == "current_liabilities" and orig in df.columns:
+                    new_cols["current_liabilities"] = df[orig]
+                    break
+            if "current_liabilities" not in new_cols and "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
+                new_cols["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+
+        # 6. inventory: 从映射查找
         if "inventory" not in df.columns or df["inventory"].isna().all():
             for orig, mapped in bs_mapping.items():
                 if mapped == "inventory" and orig in df.columns:
-                    df["inventory"] = df[orig]
+                    new_cols["inventory"] = df[orig]
                     break
 
-        # 推算 accounts_payable
+        # 7. accounts_payable: 从映射查找
         if "accounts_payable" not in df.columns or df["accounts_payable"].isna().all():
             for orig, mapped in bs_mapping.items():
                 if mapped == "accounts_payable" and orig in df.columns:
-                    df["accounts_payable"] = df[orig]
+                    new_cols["accounts_payable"] = df[orig]
                     break
 
-        return df
+        # Batch-assign to avoid DataFrame fragmentation
+        if new_cols:
+            df = df.assign(**new_cols)
 
+        return df
     def _fill_income_derived(self, df: pd.DataFrame) -> pd.DataFrame:
         """利润表数据自愈: 推算缺失的标准字段"""
         if df is None or df.empty:

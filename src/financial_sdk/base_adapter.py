@@ -7,9 +7,13 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
+import logging
+
 import pandas as pd
 
 from .exceptions import DataFormatError
+
+logger = logging.getLogger(__name__)
 
 
 class BaseAdapter(ABC):
@@ -372,6 +376,67 @@ class BaseAdapter(ABC):
                 field_name=date_column,
                 expected_format="YYYY-MM-DD",
                 actual_value=str(type(e)),
+            )
+
+        return df
+
+    def _fill_balance_derived(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        资产负债表通用数据自愈: 推算5个跨适配器公共字段
+
+        推算规则 (仅在字段缺失或全为 NaN 时触发):
+        - total_equity = total_assets - total_liabilities
+        - current_assets = total_assets - non_current_assets
+        - current_liabilities = total_liabilities - non_current_liabilities
+        - non_current_assets = total_assets - current_assets
+        - non_current_liabilities = total_liabilities - current_liabilities
+
+        子类应调用 super()._fill_balance_derived(df) 获取公共字段，
+        再添加适配器特有的推算逻辑。
+
+        Args:
+            df: 宽格式 DataFrame
+
+        Returns:
+            补全后的 DataFrame
+        """
+        if df is None or df.empty:
+            return df
+
+        new_cols = {}
+
+        # 1. total_equity = total_assets - total_liabilities
+        if "total_equity" not in df.columns or df["total_equity"].isna().all():
+            if "total_assets" in df.columns and "total_liabilities" in df.columns:
+                new_cols["total_equity"] = df["total_assets"] - df["total_liabilities"]
+
+        # 2. non_current_assets = total_assets - current_assets (if current_assets exists)
+        if "non_current_assets" not in df.columns or df["non_current_assets"].isna().all():
+            if "total_assets" in df.columns and "current_assets" in df.columns:
+                new_cols["non_current_assets"] = df["total_assets"] - df["current_assets"]
+
+        # 3. current_assets = total_assets - non_current_assets (if non_current_assets exists)
+        if "current_assets" not in df.columns or df["current_assets"].isna().all():
+            if "total_assets" in df.columns and "non_current_assets" in df.columns:
+                new_cols["current_assets"] = df["total_assets"] - df["non_current_assets"]
+
+        # 4. non_current_liabilities = total_liabilities - current_liabilities
+        if "non_current_liabilities" not in df.columns or df["non_current_liabilities"].isna().all():
+            if "total_liabilities" in df.columns and "current_liabilities" in df.columns:
+                new_cols["non_current_liabilities"] = df["total_liabilities"] - df["current_liabilities"]
+
+        # 5. current_liabilities = total_liabilities - non_current_liabilities
+        if "current_liabilities" not in df.columns or df["current_liabilities"].isna().all():
+            if "total_liabilities" in df.columns and "non_current_liabilities" in df.columns:
+                new_cols["current_liabilities"] = df["total_liabilities"] - df["non_current_liabilities"]
+
+        # Batch-assign all new columns at once to avoid DataFrame fragmentation
+        if new_cols:
+            df = df.assign(**new_cols)
+            logger.debug(
+                "[%s] _fill_balance_derived: derived %s",
+                self.adapter_name,
+                list(new_cols.keys()),
             )
 
         return df
