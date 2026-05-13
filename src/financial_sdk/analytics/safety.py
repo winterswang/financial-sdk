@@ -6,6 +6,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -51,7 +55,7 @@ def _get_current_ratio_from_akshare(stock_code: str) -> Optional[float]:
                     return float(val[0])
 
     except Exception:
-        pass
+        logger.debug("AkShare fallback query failed", exc_info=True)
 
     return None
 
@@ -88,7 +92,7 @@ def _get_quick_ratio_from_akshare(stock_code: str) -> Optional[float]:
                     return float(val[0])
 
     except Exception:
-        pass
+        logger.debug("AkShare fallback query failed", exc_info=True)
 
     return None
 
@@ -260,6 +264,7 @@ class SafetyAnalyzer(BaseAnalyzer):
                     "indicators": bundle.indicators,
                 }
             except Exception:
+                logger.debug("AkShare ratio query failed", exc_info=True)
                 return None
         else:
             fs_data = self._get_financial_data(stock_code, period)
@@ -601,6 +606,7 @@ class SafetyAnalyzer(BaseAnalyzer):
                 calculation_timestamp=datetime.now().isoformat(),
             )
         except Exception:
+            logger.debug("Safety metric calculation failed", exc_info=True)
             return None
 
     def health_check(self) -> Dict[str, Any]:
@@ -610,6 +616,7 @@ class SafetyAnalyzer(BaseAnalyzer):
         try:
             self._price_provider.get_price("600000.SH")
         except Exception:
+            logger.debug("Price provider health check failed", exc_info=True)
             price_healthy = False
 
         facade_healthy = result["status"] == "healthy"

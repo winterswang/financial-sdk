@@ -6,6 +6,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -210,6 +214,7 @@ class GrowthAnalyzer(BaseAnalyzer):
                     "indicators": bundle.indicators,
                 }
             except Exception:
+                logger.debug("Analysis failed, returning None", exc_info=True)
                 return None
         else:
             fs_data = self._get_financial_data(stock_code, period)
@@ -438,6 +443,7 @@ class GrowthAnalyzer(BaseAnalyzer):
                 calculation_timestamp=datetime.now().isoformat(),
             )
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def health_check(self) -> Dict[str, Any]:

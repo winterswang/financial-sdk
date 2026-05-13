@@ -468,12 +468,10 @@ class FinancialAnalytics:
             valuation = self._valuation.get_valuation_metrics(stock_code, period)
             if valuation is None:
                 failed_dims.append("valuation")
-                logger.warning(
-                    f"Stock {stock_code}: valuation returned None (data unavailable)"
-                )
+                logger.warning("Stock %s: valuation returned None (data unavailable)", stock_code)
         except Exception as e:
             failed_dims.append("valuation")
-            logger.warning(f"Stock {stock_code}: valuation analysis failed: {e}")
+            logger.warning("Stock %s: valuation analysis failed: %s", stock_code, e)
 
         profitability = None
         try:
@@ -482,48 +480,40 @@ class FinancialAnalytics:
             )
             if profitability is None:
                 failed_dims.append("profitability")
-                logger.warning(
-                    f"Stock {stock_code}: profitability returned None (data unavailable)"
-                )
+                logger.warning("Stock %s: profitability returned None (data unavailable)", stock_code)
         except Exception as e:
             failed_dims.append("profitability")
-            logger.warning(f"Stock {stock_code}: profitability analysis failed: {e}")
+            logger.warning("Stock %s: profitability analysis failed: %s", stock_code, e)
 
         efficiency = None
         try:
             efficiency = self._efficiency.get_efficiency_metrics(stock_code, period)
             if efficiency is None:
                 failed_dims.append("efficiency")
-                logger.warning(
-                    f"Stock {stock_code}: efficiency returned None (data unavailable)"
-                )
+                logger.warning("Stock %s: efficiency returned None (data unavailable)", stock_code)
         except Exception as e:
             failed_dims.append("efficiency")
-            logger.warning(f"Stock {stock_code}: efficiency analysis failed: {e}")
+            logger.warning("Stock %s: efficiency analysis failed: %s", stock_code, e)
 
         growth = None
         try:
             growth = self._growth.get_growth_metrics(stock_code, period)
             if growth is None:
                 failed_dims.append("growth")
-                logger.warning(
-                    f"Stock {stock_code}: growth returned None (data unavailable)"
-                )
+                logger.warning("Stock %s: growth returned None (data unavailable)", stock_code)
         except Exception as e:
             failed_dims.append("growth")
-            logger.warning(f"Stock {stock_code}: growth analysis failed: {e}")
+            logger.warning("Stock %s: growth analysis failed: %s", stock_code, e)
 
         safety = None
         try:
             safety = self._safety.get_safety_metrics(stock_code, period)
             if safety is None:
                 failed_dims.append("safety")
-                logger.warning(
-                    f"Stock {stock_code}: safety returned None (data unavailable)"
-                )
+                logger.warning("Stock %s: safety returned None (data unavailable)", stock_code)
         except Exception as e:
             failed_dims.append("safety")
-            logger.warning(f"Stock {stock_code}: safety analysis failed: {e}")
+            logger.warning("Stock %s: safety analysis failed: %s", stock_code, e)
 
         # 所有维度都失败时返回 None
         if all(
@@ -684,6 +674,7 @@ class FinancialAnalytics:
             return result
 
         except Exception:
+            logger.debug("Analysis failed, returning empty dict", exc_info=True)
             return {}
 
     def _create_period_bundle(self, bundle: Any, date: str) -> Optional[Any]:
@@ -713,6 +704,7 @@ class FinancialAnalytics:
 
             return period_bundle
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def get_valuation(

@@ -74,6 +74,7 @@ class BaseAnalyzer(ABC):
                 "indicators": bundle.indicators,
             }
         except Exception:
+            logger.debug(f"[{self.analyzer_name}] Failed to get financial data", exc_info=True)
             return {
                 "income_statement": None,
                 "balance_sheet": None,
@@ -96,15 +97,11 @@ class BaseAnalyzer(ABC):
             值或 None
         """
         if df is None or df.empty:
-            logger.debug(
-                f"[{self.analyzer_name}] _get_value('{field}'): DataFrame 为空"
-            )
+            logger.debug("[%s] _get_value('%s'): DataFrame 为空", self.analyzer_name, field)
             return None
         if field not in df.columns:
-            available = sorted(df.columns.tolist())
-            logger.warning(
-                f"[{self.analyzer_name}] 字段 '{field}' 不存在于 DataFrame, "
-                f"可用列: {available[:20]}{'...' if len(available) > 20 else ''}"
+            logger.debug(
+                f"[{self.analyzer_name}] 字段 '{field}' 不存在于 DataFrame"
             )
             return None
 
@@ -116,9 +113,7 @@ class BaseAnalyzer(ABC):
 
         values = df_sorted[field].dropna()
         if values.empty:
-            logger.debug(
-                f"[{self.analyzer_name}] _get_value('{field}'): 字段存在但值为空"
-            )
+            logger.debug("[%s] _get_value('%s'): 字段存在但值为空", self.analyzer_name, field)
             return None
 
         if period_index < len(values):
@@ -147,6 +142,7 @@ class BaseAnalyzer(ABC):
         try:
             self._facade.health_check()
         except Exception:
+            logger.debug("Facade health check failed", exc_info=True)
             facade_healthy = False
 
         return {

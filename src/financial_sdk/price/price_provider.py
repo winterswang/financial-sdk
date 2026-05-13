@@ -209,6 +209,7 @@ class PriceProvider:
             )
 
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def _to_yahoo_symbol(self, stock_code: str, market: str) -> Optional[str]:
@@ -308,6 +309,7 @@ class PriceProvider:
                 )
 
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
         return None
@@ -447,11 +449,9 @@ class PriceProvider:
                                                     price = float(quotes[0].last_done)
                                                     return price * total_shares
                     except Exception as e2:
-                        logger.debug(
-                            f"Longbridge SDK retry failed for {stock_code}: {e2}"
-                        )
+                        logger.debug("Longbridge SDK retry failed for %s: %s", stock_code, e2)
             else:
-                logger.debug(f"Longbridge SDK market cap failed for {stock_code}: {e}")
+                logger.debug("Longbridge SDK market cap failed for %s: %s", stock_code, e)
 
         return None
 
@@ -500,11 +500,13 @@ class PriceProvider:
             try:
                 resp = req.get(url, headers=headers, timeout=10)
             except Exception:
+                logger.debug("Direct connection failed, trying proxy", exc_info=True)
                 # 直连失败，尝试 SOCKS 代理
                 try:
                     session = _get_socks_session()
                     resp = session.request("GET", url, headers=headers, timeout=10)
                 except Exception:
+                    logger.debug("Check failed, returning False", exc_info=True)
                     return False
 
             if not hasattr(resp, "status_code"):
@@ -540,7 +542,7 @@ class PriceProvider:
             return True
 
         except Exception as e:
-            logger.debug(f"Failed to refresh Longbridge token: {e}")
+            logger.debug("Failed to refresh Longbridge token: %s", e)
             return False
 
     def _get_market_cap_from_eastmoney(
@@ -606,6 +608,7 @@ class PriceProvider:
                         return float(market_cap)
 
         except Exception:
+            logger.debug("Silently skipped", exc_info=True)
             pass
 
         return None
@@ -648,6 +651,7 @@ class PriceProvider:
             if market_cap_raw:
                 return float(market_cap_raw)
         except Exception:
+            logger.debug("Silently skipped", exc_info=True)
             pass
 
         return None
@@ -735,6 +739,7 @@ class PriceProvider:
             return float(last_price) * total_shares
 
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def get_market_cap(self, stock_code: str) -> Optional[float]:
@@ -816,6 +821,7 @@ class PriceProvider:
                             if val and str(val) != "nan":
                                 return float(val)
         except Exception:
+            logger.debug("Silently skipped", exc_info=True)
             pass
 
         return None
@@ -841,6 +847,7 @@ class PriceProvider:
             )
             return QuoteContext(lp_config)
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def _refresh_longbridge_token(self) -> bool:
@@ -898,6 +905,7 @@ class PriceProvider:
             return False
 
         except Exception:
+            logger.debug("Check failed, returning False", exc_info=True)
             return False
 
     def _get_price_from_longbridge(
@@ -972,6 +980,7 @@ class PriceProvider:
                                         source="longbridge",
                                     )
                         except Exception:
+                            logger.debug("Silently skipped", exc_info=True)
                             pass
             return None
 
@@ -1151,6 +1160,7 @@ class PriceProvider:
                         return float(price)
 
         except Exception:
+            logger.debug("Silently skipped", exc_info=True)
             pass
 
         return None

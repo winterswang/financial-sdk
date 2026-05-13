@@ -10,6 +10,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -417,6 +421,7 @@ class IntrinsicValueAnalyzer(BaseAnalyzer):
             )
 
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def _calculate_dcf(

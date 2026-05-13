@@ -453,9 +453,7 @@ class ValuationAnalyzer(BaseAnalyzer):
                         _exchange_rate_cache[reverse_key] = (reverse_rate, now)
                     return rate
         except Exception as e:
-            logger.warning(
-                f"Failed to get exchange rate {from_currency}->{to_currency}: {e}"
-            )
+            logger.warning("Failed to get exchange rate %s->%s: %s", from_currency, to_currency, e)
 
         # 备用汇率（带标注日期）
         entry = _FALLBACK_RATES.get(cache_key)
@@ -501,6 +499,7 @@ class ValuationAnalyzer(BaseAnalyzer):
 
             return self._calculator.calculate_yoy_growth(current, previous)
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def get_pe_ratio(self, stock_code: str, period: str = "annual") -> Optional[float]:
@@ -578,6 +577,7 @@ class ValuationAnalyzer(BaseAnalyzer):
         try:
             self._price_provider.get_price("600000.SH")
         except Exception:
+            logger.debug("Price health check failed", exc_info=True)
             price_healthy = False
 
         facade_healthy = result["status"] == "healthy"
