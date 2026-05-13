@@ -333,6 +333,7 @@ class FinancialFacade:
                 df = self._fetch_report(adapter, stock_code, report_type, period)
                 return df
             except Exception:
+                logger.debug("Skipped, continuing", exc_info=True)
                 continue
         return None
 

@@ -6,6 +6,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, Optional
@@ -154,6 +158,7 @@ class EfficiencyAnalyzer(BaseAnalyzer):
             income = bundle.income_statement
             balance = bundle.balance_sheet
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
         if balance is None or balance.empty:

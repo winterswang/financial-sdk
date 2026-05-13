@@ -221,6 +221,7 @@ class BaseAdapter(ABC):
                 try:
                     df[col] = pd.to_numeric(df[col], errors="coerce")
                 except Exception:
+                    logger.debug("Silently skipped", exc_info=True)
                     pass
 
         return df

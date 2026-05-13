@@ -10,6 +10,10 @@
 
 from __future__ import annotations
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -391,6 +395,7 @@ class FCFAnalyzer(BaseAnalyzer):
             )
 
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def _get_value_from_df(self, df: Any, field: str) -> Optional[float]:

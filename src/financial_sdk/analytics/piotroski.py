@@ -218,6 +218,7 @@ class PiotroskiAnalyzer(BaseAnalyzer):
             )
 
         except Exception:
+            logger.debug("Analysis failed, returning None", exc_info=True)
             return None
 
     def _analyze_single_period(

@@ -750,7 +750,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
         if derived_fields:
             df["_derived_fields"] = "; ".join(derived_fields)
             for field in derived_fields:
-                logger.info(f"Data self-healing: derived {field}")
+                logger.info("Data self-healing: derived %s", field)
 
         # === 美股/港股补全: 从已知字段推算缺失的标准字段 ===
         # 非流动资产 = 已知非流动资产组分之和，或 total_assets - 已知流动资产组分
@@ -858,7 +858,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
         if derived_fields:
             df["_derived_fields"] = "; ".join(derived_fields)
             for field in derived_fields:
-                logger.info(f"Data self-healing: derived {field}")
+                logger.info("Data self-healing: derived %s", field)
 
         return df
 
@@ -916,7 +916,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             data = self._run_command(["dividend", stock_code, "--format", "json"])
             return self._parse_dividend(data)
         except Exception as e:
-            logger.warning(f"Failed to get dividend for {stock_code}: {e}")
+            logger.warning("Failed to get dividend for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def _parse_dividend(self, data: Dict[str, Any]) -> pd.DataFrame:
@@ -960,7 +960,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             )
             return self._parse_institution_rating(data)
         except Exception as e:
-            logger.warning(f"Failed to get institution rating for {stock_code}: {e}")
+            logger.warning("Failed to get institution rating for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def _parse_institution_rating(self, data: Dict[str, Any]) -> pd.DataFrame:
@@ -1009,7 +1009,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             data = self._run_command(["valuation", stock_code, "--format", "json"])
             return self._parse_valuation(data)
         except Exception as e:
-            logger.warning(f"Failed to get valuation for {stock_code}: {e}")
+            logger.warning("Failed to get valuation for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def _parse_valuation(self, data: Dict[str, Any]) -> pd.DataFrame:
@@ -1064,7 +1064,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             )
             return self._parse_fund_holder(data)
         except Exception as e:
-            logger.warning(f"Failed to get fund holder for {stock_code}: {e}")
+            logger.warning("Failed to get fund holder for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def _parse_fund_holder(self, data: Dict[str, Any]) -> pd.DataFrame:
@@ -1110,7 +1110,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             )
             return self._parse_shareholder(data)
         except Exception as e:
-            logger.warning(f"Failed to get shareholder for {stock_code}: {e}")
+            logger.warning("Failed to get shareholder for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def _parse_shareholder(self, data: Dict[str, Any]) -> pd.DataFrame:
@@ -1152,7 +1152,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             data = self._run_command(["quote", stock_code, "--format", "json"])
             return data[0] if data else {}
         except Exception as e:
-            logger.warning(f"Failed to get quote for {stock_code}: {e}")
+            logger.warning("Failed to get quote for %s: %s", stock_code, e)
             return {}
 
     def get_calc_indexes(
@@ -1177,7 +1177,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             )
             return self._parse_calc_indexes(data, stock_code)
         except Exception as e:
-            logger.warning(f"Failed to get calc indexes for {stock_code}: {e}")
+            logger.warning("Failed to get calc indexes for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def get_capital_flow(self, stock_code: str) -> pd.DataFrame:
@@ -1199,7 +1199,7 @@ class LongbridgeCLIAdapter(BaseAdapter):
             )
             return self._parse_capital_flow(data)
         except Exception as e:
-            logger.warning(f"Failed to get capital flow for {stock_code}: {e}")
+            logger.warning("Failed to get capital flow for %s: %s", stock_code, e)
             return pd.DataFrame()
 
     def _parse_capital_flow(self, data: Dict[str, Any]) -> pd.DataFrame:
